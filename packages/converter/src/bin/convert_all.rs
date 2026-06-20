@@ -673,15 +673,162 @@ mod mpc_msf {
         buf
     }
 
+    /// Convert IMG File Ver1.0 (sword2 PNG-packed format) to MSF v2.
+    /// Layout: 16-byte magic, then per-frame: [size u32, offx u32, offy u32, pad u32, png_data].
+    /// Global width/height at 0x14/0x18; frame_count at 0x10.
+    fn convert_img_to_msf(data: &[u8]) -> Option<Vec<u8>> {
+        if data.len() < 0x40 {
+            return None;
+        }
+        let frame_count = get_u32_le(data, 0x10) as usize;
+        if frame_count == 0 {
+            return None;
+        }
+        // IMG global header stores direction count at 0x14. Character sprites are 8-directional;
+        // the engine's draw path computes `min(currentDir, directions-1)`, so directions=0 yields a
+        // negative frame index and the sprite is silently skipped. Must carry the real value.
+        let direction = get_u32_le(data, 0x14) as u8;
+        // IMG header 0x18 = frame interval in ms (stand=100, walk=50, run faster). Hardcoding
+        // fps=15 desyncs animation speed from movement → visible stutter. Derive fps like the MPC
+        // path (1000/interval), matching convert_mpc_to_msf.
+        let img_interval = get_u32_le(data, 0x18);
+        let fps = if img_interval > 0 {
+            (1000 / img_interval).min(255) as u8
+        } else {
+            15
+        };
+
+        let mut pos = 0x30usize;
+        let mut frame_entries: Vec<FrameEntry> = Vec::with_capacity(frame_count);
+        // Raw (uncompressed) RGBA per frame; the whole blob is zstd-compressed once below,
+        // and data_offset/length record positions in the UNcompressed concat — matching the
+        // MSF contract the decoder expects (get_blob decompresses the blob once, then slices).
+        let mut raw_frames: Vec<Vec<u8>> = Vec::with_capacity(frame_count);
+
+        for _ in 0..frame_count {
+            if pos + 0x10 > data.len() {
+                return None;
+            }
+            let png_size = get_u32_le(data, pos) as usize;
+            let offx = get_u32_le(data, pos + 4) as i16;
+            let offy = get_u32_le(data, pos + 8) as i16;
+            pos += 0x10;
+
+            if pos + png_size > data.len() {
+                return None;
+            }
+            let png_bytes = data[pos..pos + png_size].to_vec();
+            pos += png_size;
+
+            // decode PNG to RGBA
+            let cursor = std::io::Cursor::new(&png_bytes);
+            let img = image::load(cursor, image::ImageFormat::Png).ok()?;
+            let rgba = img.to_rgba8();
+            let (w, h) = (rgba.width() as u16, rgba.height() as u16);
+            raw_frames.push(rgba.into_raw());
+
+            // Temporarily stash the raw IMG per-frame xOffset/yOffset in offset_x/offset_y;
+            // converted to canvas-relative offsets below once the global max is known.
+            frame_entries.push(FrameEntry {
+                offset_x: offx,
+                offset_y: offy,
+                width: w,
+                height: h,
+                data_offset: 0, // filled below
+                data_length: 0,
+            });
+        }
+
+        // IMG per-frame xOffset/yOffset are PER-FRAME ANCHORS: the original engine (SHF) draws
+        // `screenPos = worldPos - xOffset` (verified in SHF EngineBase/SkillsPanel). Our MSF draw
+        // path is `drawX = worldX - anchorLeft + canvasOffsetX` (canvasOffsetX is ADDED). To make
+        // the two equivalent we set a uniform anchor = max(xOffset) and store each frame's
+        // canvas offset as `maxXOffset - xOffset`, so every frame's anchor aligns to the same world
+        // point: drawX = worldX - maxX + (maxX - xOffset) = worldX - xOffset. Storing the raw
+        // xOffset directly (the old bug) flipped the sign → frames with varying xOffset (diagonal
+        // walk) jittered horizontally.
+        let max_xoff = frame_entries.iter().map(|e| e.offset_x).max().unwrap_or(0);
+        let max_yoff = frame_entries.iter().map(|e| e.offset_y).max().unwrap_or(0);
+        for e in frame_entries.iter_mut() {
+            e.offset_x = max_xoff - e.offset_x;
+            e.offset_y = max_yoff - e.offset_y;
+        }
+
+        // Canvas must cover every frame at its new canvas-relative offset. The decoder allocates
+        // cw*ch*4 per frame and drops rows exceeding it, so canvas MUST span max(offset + size).
+        let canvas_width = frame_entries
+            .iter()
+            .filter(|e| e.width > 0)
+            .map(|e| (e.offset_x.max(0) as u16).saturating_add(e.width))
+            .max()
+            .unwrap_or(0);
+        let canvas_height = frame_entries
+            .iter()
+            .filter(|e| e.height > 0)
+            .map(|e| (e.offset_y.max(0) as u16).saturating_add(e.height))
+            .max()
+            .unwrap_or(0);
+
+        // Concat uncompressed frames, recording uncompressed offsets, then zstd once.
+        let mut concat_raw: Vec<u8> = Vec::new();
+        for (entry, raw) in frame_entries.iter_mut().zip(raw_frames.iter()) {
+            entry.data_offset = concat_raw.len() as u32;
+            entry.data_length = raw.len() as u32;
+            concat_raw.extend_from_slice(raw);
+        }
+        let blob = zstd::encode_all(concat_raw.as_slice(), 3).ok()?;
+
+        let flags: u16 = 1; // bit 0: zstd (blob below is zstd-compressed)
+        let frame_table_bytes = frame_count * FRAME_ENTRY_SIZE;
+        let total = 8 + 16 + 4 + frame_table_bytes + 8 + blob.len();
+        let mut out = Vec::with_capacity(total);
+
+        out.extend_from_slice(MSF_MAGIC);
+        out.extend_from_slice(&MSF_VERSION.to_le_bytes());
+        out.extend_from_slice(&flags.to_le_bytes());
+        out.extend_from_slice(&canvas_width.to_le_bytes());
+        out.extend_from_slice(&canvas_height.to_le_bytes());
+        out.extend_from_slice(&(frame_count as u16).to_le_bytes());
+        out.push(direction); // from IMG header 0x14 (8 for character sprites)
+        out.push(fps); // from IMG header 0x18 interval (was hardcoded 15 → stutter)
+        // Uniform anchor = max per-frame xOffset/yOffset (see frame-offset rebasing above).
+        // Combined with the rebased per-frame offsets this reproduces SHF's `screenPos = worldPos - xOffset`.
+        out.extend_from_slice(&max_xoff.to_le_bytes()); // left (anchor_x)
+        out.extend_from_slice(&max_yoff.to_le_bytes()); // bottom (anchor_y)
+        out.extend_from_slice(&[0u8; 4]);
+        out.push(0); // PixelFormat=Rgba8
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out.push(0);
+        for entry in &frame_entries {
+            out.extend_from_slice(&entry.offset_x.to_le_bytes());
+            out.extend_from_slice(&entry.offset_y.to_le_bytes());
+            out.extend_from_slice(&entry.width.to_le_bytes());
+            out.extend_from_slice(&entry.height.to_le_bytes());
+            out.extend_from_slice(&entry.data_offset.to_le_bytes());
+            out.extend_from_slice(&entry.data_length.to_le_bytes());
+        }
+        out.extend_from_slice(CHUNK_END);
+        out.extend_from_slice(&0u32.to_le_bytes());
+        out.extend_from_slice(&blob);
+        Some(out)
+    }
+
     pub fn convert_mpc_to_msf(
         mpc_data: &[u8],
         shd_data: Option<&[u8]>,
         use_palette_alpha: bool,
     ) -> Option<Vec<u8>> {
-        if mpc_data.len() < 160 {
+        if mpc_data.len() < 16 {
             return None;
         }
         let sig = std::str::from_utf8(&mpc_data[0..12]).ok()?;
+        // sword2 uses PNG-packed IMG format
+        if sig.starts_with("IMG File Ver") {
+            return convert_img_to_msf(mpc_data);
+        }
+        if mpc_data.len() < 160 {
+            return None;
+        }
         if !sig.starts_with("MPC File Ver") {
             return None;
         }
@@ -1500,7 +1647,7 @@ fn convert_media_files(resources_dir: &Path) -> (usize, usize, usize) {
             let result = std::process::Command::new("ffmpeg")
                 .args(["-y", "-i"])
                 .arg(wma)
-                .args(["-acodec", "libvorbis", "-q:a", "6"])
+                .args(["-acodec", "vorbis", "-strict", "experimental", "-q:a", "6"])
                 .arg(&ogg)
                 .args(["-loglevel", "warning"])
                 .status();

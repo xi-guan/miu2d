@@ -195,13 +195,21 @@ export class Loader {
   async newGame(): Promise<void> {
     logger.log("[Loader] Starting new game...");
 
-    const { screenEffects, getScriptExecutor, clearVariables, resetEventId, resetGameTime } =
-      this.deps;
+    const {
+      screenEffects,
+      getScriptExecutor,
+      clearVariables,
+      resetEventId,
+      resetGameTime,
+      clearScriptCache,
+    } = this.deps;
 
     // 重置基本状态
     clearVariables();
     resetEventId();
     resetGameTime();
+    // 清空脚本解析缓存：与 loadGameFromJSON 对齐，确保新游戏读取最新脚本
+    clearScriptCache();
 
     // 清空多角色档案存储（新游戏从资源文件加载初始数据）
     this.characterProfileStore.clear();
@@ -403,22 +411,26 @@ export class Loader {
       );
 
       // Task C: NPC 文件
-      if (initialNpc) {
+      // initialNpc 仅指定首图的 NPC 文件；为空时（如 sword2，NPC 文件按拼音命名
+      // 与中文地图名不同）回退到 <地图名>.npc，由后端按场景兜底返回实际文件。
+      const npcFile = initialNpc || `${this.deps.getCurrentMapName()}.npc`;
+      if (npcFile) {
         parallelTasks.push(
           (async () => {
             const t = performance.now();
-            await npcManager.loadNpcFile(initialNpc);
+            await npcManager.loadNpcFile(npcFile);
             time("NPCs", t);
           })()
         );
       }
 
-      // Task D: Obj 文件
-      if (initialObj) {
+      // Task D: Obj 文件（同 NPC 回退逻辑）
+      const objFile = initialObj || `${this.deps.getCurrentMapName()}.obj`;
+      if (objFile) {
         parallelTasks.push(
           (async () => {
             const t = performance.now();
-            await objManager.load(initialObj);
+            await objManager.load(objFile);
             time("OBJs", t);
           })()
         );

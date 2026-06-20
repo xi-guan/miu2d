@@ -8,7 +8,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { Prisma, Save as PrismaSave } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
-import { deleteFile, uploadFile } from "../../storage/s3";
+import { deleteFile, getDownloadUrl, uploadFile } from "../../storage/s3";
 import { verifyGameOwnerAccess } from "../../utils/gameAccess";
 import { Logger } from "../../utils/logger.js";
 
@@ -60,7 +60,7 @@ export class SaveService {
       },
     });
 
-    return rows.map((r) => this.toOutput(r));
+    return Promise.all(rows.map((r) => this.toOutput(r)));
   }
 
   /**
@@ -74,7 +74,7 @@ export class SaveService {
     }
 
     return {
-      ...this.toOutput(row),
+      ...(await this.toOutput(row)),
       data: row.data as unknown as Prisma.InputJsonValue,
     };
   }
@@ -221,7 +221,7 @@ export class SaveService {
     }
 
     return {
-      ...this.toOutput(row),
+      ...(await this.toOutput(row)),
       userName: row.user.name,
       data: row.data as unknown as Prisma.InputJsonValue,
     };
@@ -265,7 +265,9 @@ export class SaveService {
     });
 
     return {
-      items: rows.map((r) => ({ ...this.toOutput(r), userName: r.user.name })),
+      items: await Promise.all(
+        rows.map(async (r) => ({ ...(await this.toOutput(r)), userName: r.user.name }))
+      ),
       total,
       page: input.page,
       pageSize: input.pageSize,
@@ -288,7 +290,7 @@ export class SaveService {
     await verifyGameOwnerAccess(row.gameId, operatorId);
 
     return {
-      ...this.toOutput(row),
+      ...(await this.toOutput(row)),
       userName: row.user.name,
       data: row.data as unknown as Prisma.InputJsonValue,
     };
@@ -437,8 +439,18 @@ export class SaveService {
     return game;
   }
 
-  private toOutput(row: Omit<PrismaSave, "data">) {
-    const screenshot = row.screenshot ?? undefined;
+  private async toOutput(row: Omit<PrismaSave, "data">) {
+    // screenshot 可能是旧的 base64 data URI，或新的 S3 key（私有 bucket）。
+    // S3 key 需签名为临时可访问 URL，前端才能直接用作 <img src>。
+    let screenshot = row.screenshot ?? undefined;
+    if (screenshot && !isBase64DataUri(screenshot)) {
+      try {
+        screenshot = await getDownloadUrl(screenshot);
+      } catch (e) {
+        logger.error("[SaveService] Failed to sign screenshot URL:", e);
+        screenshot = undefined;
+      }
+    }
 
     return {
       id: row.id,

@@ -15,6 +15,7 @@ import { getCharacterDeathExp } from "../combat/effect-calc";
 import { logger } from "../core/logger";
 import type { CharacterConfig, Vector2 } from "../core/types";
 import { CharacterState, RUN_SPEED_FOLD, TILE_WIDTH } from "../core/types";
+import { getGameConfig } from "../data/game-data-api";
 import type { MagicSprite } from "../magic/magic-sprite";
 import type { MagicData } from "../magic/types";
 import { Obj } from "../obj/obj";
@@ -358,7 +359,8 @@ export abstract class Character extends CharacterCombat {
   }
 
   protected updateRunning(deltaTime: number): void {
-    this.moveAlongPath(deltaTime, RUN_SPEED_FOLD);
+    const speedFold = getGameConfig()?.speed?.runSpeedFold ?? RUN_SPEED_FOLD;
+    this.moveAlongPath(deltaTime, speedFold);
     super.update(deltaTime);
   }
 

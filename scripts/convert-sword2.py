@@ -2115,11 +2115,12 @@ def step_map_tiles(root: str):
                 total_maps += 1
                 continue
         else:
+            # .map 的 tile 包路径原为 GBK，但部分来源(jxqy2-assets)已转 UTF-8。
+            # 先试 UTF-8 再回退 GBK，否则把 UTF-8 字节当 GBK 解会得到乱码目录名。
             try:
+                tile_path_raw = tile_bytes.decode("utf-8")
+            except UnicodeDecodeError:
                 tile_path_raw = tile_bytes.decode("gbk", errors="replace")
-            except Exception:
-                warnings.append(f"{map_name}: GBK 解码失败")
-                continue
 
             # Extract last path component (e.g., "\\mpc\\map\\长安" or "\\mpc\\map\\狂沙镇\\" → "狂沙镇")
             pack_name = tile_path_raw.replace("\\\\", "/").replace("\\", "/").rstrip("/").split("/")[-1].strip()

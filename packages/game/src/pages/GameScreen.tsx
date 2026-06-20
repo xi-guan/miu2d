@@ -250,14 +250,17 @@ export default function GameScreen() {
           document.title = config.gameName;
         }
         if (config?.logoUrl?.startsWith("games/")) {
-          const logoUrl = getS3Url(`${config.logoUrl}_512`);
-          setGameLogoUrl(logoUrl);
+          // Use the server logo route (reads from private MinIO); a raw /s3 key 403s
+          // because the bucket is private and the URL is unsigned.
+          const logoBase = `${getResourceDomain()}/game/${gameSlug}/api/logo`;
+          // store the size-less base; consumers append /<size> (e.g. `${gameLogoUrl}/192`)
+          setGameLogoUrl(logoBase);
           document
             .querySelectorAll<HTMLLinkElement>("link[rel~='icon']")
             .forEach((el) => el.remove());
           const link = document.createElement("link");
           link.rel = "icon";
-          link.href = getS3Url(`${config.logoUrl}_128`);
+          link.href = `${logoBase}/128`;
           document.head.appendChild(link);
           // 注入游戏专属 PWA manifest，包含游戏名称、图标和 start_url
           const manifestEl = document.querySelector<HTMLLinkElement>("link[rel='manifest']");
@@ -476,7 +479,7 @@ export default function GameScreen() {
           >
             <GameTopBar
               gameName={gameName}
-              logoUrl={gameLogoUrl ?? undefined}
+              logoUrl={gameLogoUrl ? `${gameLogoUrl}/192` : undefined}
               toolbarButtons={
                 gamePhase === "playing"
                   ? toolbarButtons
@@ -577,7 +580,7 @@ export default function GameScreen() {
             onClose={() => setTitleMenuVisible(false)}
             activeTab={titleMenuTab}
             onTabChange={setTitleMenuTab}
-            logoUrl={gameLogoUrl ?? undefined}
+            logoUrl={gameLogoUrl ? `${gameLogoUrl}/192` : undefined}
             gameSlug={gameSlug}
             canSave={false}
             onCollectSaveData={() => null}
@@ -616,7 +619,7 @@ export default function GameScreen() {
         {/* PWA 安装提示（游戏配置加载完成后展示，7天内不重复提示） */}
         <PWAInstallPrompt
           gameName={gameName}
-          logoUrl={gameLogoUrl ?? undefined}
+          logoUrl={gameLogoUrl ? `${gameLogoUrl}/192` : undefined}
           ready={gamePhase === "title" || gamePhase === "playing"}
         />
       </div>

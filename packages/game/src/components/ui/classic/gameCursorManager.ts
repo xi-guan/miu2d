@@ -86,7 +86,12 @@ function initializeCursorStyles(): void {
 
   // 为每个帧创建单独的类
   cachedFrameDataUrls.forEach((dataUrl, index) => {
-    const cursorValue = `url(${dataUrl}) 0 0, auto`;
+    // getCompositeFrameCanvas 把 tight-bbox 帧画到 canvas 的 (canvasOffsetX, canvasOffsetY) 处，
+    // 所以 PNG 内箭头从该偏移开始；CSS 热点须用同一偏移，否则指针与箭头错位（指针偏上）。
+    const frame = cachedAsfData?.frames[index];
+    const hotX = frame?.canvasOffsetX ?? 0;
+    const hotY = frame?.canvasOffsetY ?? 0;
+    const cursorValue = `url(${dataUrl}) ${hotX} ${hotY}, auto`;
     cssContent += `
     .game-cursor-frame-${index},
     .game-cursor-frame-${index} * {

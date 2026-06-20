@@ -36,27 +36,27 @@ export function GameTopBar({ gameName, logoUrl, toolbarButtons, onLoginClick }: 
         {!isPWA && <span className="truncate">{gameName}</span>}
       </div>
 
-      {/* 中间：工具栏按钮 */}
-      {toolbarButtons && toolbarButtons.length > 0 && (
-        <div className="flex items-center gap-1">
-          {toolbarButtons.map((btn) => (
-            <button
-              key={btn.id}
-              onClick={btn.onClick}
-              className={`h-8 px-2 flex items-center gap-1.5 rounded-md text-sm transition-all duration-150
+      {/* 中间：工具栏按钮 + 面板图标(由 ModernGameUIWrapper 通过 Portal 投递进 #game-toolbar-panels) */}
+      <div className="flex items-center gap-1">
+        {toolbarButtons?.map((btn) => (
+          <button
+            key={btn.id}
+            onClick={btn.onClick}
+            className={`h-8 px-2 flex items-center gap-1.5 rounded-md text-sm transition-all duration-150
                 ${
                   btn.active
                     ? "bg-white/15 text-white"
                     : "text-white/70 hover:text-white hover:bg-white/10"
                 }`}
-              title={btn.tooltip}
-            >
-              {btn.icon}
-              <span className="text-xs">{btn.tooltip}</span>
-            </button>
-          ))}
-        </div>
-      )}
+            title={btn.tooltip}
+          >
+            {btn.icon}
+            <span className="text-xs">{btn.tooltip}</span>
+          </button>
+        ))}
+        {/* 面板切换图标 Portal 挂载点（状态/装备/物品/武功…） */}
+        <div id="game-toolbar-panels" className="flex items-center gap-1" />
+      </div>
 
       {/* 右侧：用户信息 */}
       <div className="flex items-center gap-2">

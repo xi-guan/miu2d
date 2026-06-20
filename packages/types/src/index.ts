@@ -661,3 +661,12 @@ export {
   UserSettingsSchema,
   UserUpdateInputSchema,
 } from "./user.js";
+export type {
+  DroppedFileEntry,
+  ParseResourcesOptions,
+  ParsedModuleData,
+  ParsedScene,
+  ResourceFile,
+} from "./resource-import.js";
+// 资源文件夹解析器（浏览器与 Node 共用）
+export { parseResourcesFolder } from "./resource-import.js";

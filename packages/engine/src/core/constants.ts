@@ -12,7 +12,7 @@ export const TILE_HEIGHT = 32;
 // Walk: speedFold = WalkSpeed (default 1)
 // Run: speedFold = RunSpeedFold (default 8)
 export const BASE_SPEED = 100;
-export const RUN_SPEED_FOLD = 8; // Globals.RunSpeedFold (跑步速度是走路的8倍!)
+export const RUN_SPEED_FOLD = 4; // Globals.RunSpeedFold (fallback; overridden by GameConfig.speed.runSpeedFold)
 export const DEFAULT_RUN_SPEED = BASE_SPEED * RUN_SPEED_FOLD;
 export const MIN_CHANGE_MOVE_SPEED_PERCENT = -90;
 

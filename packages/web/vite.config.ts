@@ -70,7 +70,7 @@ export default defineConfig(({ mode }) => {
   // 代理目标：本地默认各自端口，设置环境变量后可代理到远端
   // 用法：在 .env.local 中设置 BACKEND_URL=https://xxx 和 S3_URL=https://xxx
   const backendUrl = env.BACKEND_URL ?? "http://localhost:4100";
-  const s3Url = env.S3_URL ?? "http://localhost:9100";
+  const s3Url = env.S3_URL ?? "http://localhost:9110";
   // 仅直连本地 MinIO 时需要去掉 /s3 前缀；远端 nginx 已处理 /s3/ 路由
   const s3StripPrefix = !env.S3_URL;
 
@@ -105,6 +105,18 @@ export default defineConfig(({ mode }) => {
             options: {
               cacheName: "wasm-cache",
               expiration: { maxEntries: 20, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // Script/text resources: NetworkFirst (scripts iterate; CacheFirst would
+          // serve stale .txt forever — this masked dialog-id rewrites in dev)
+          {
+            urlPattern: /^https?:\/\/.*\/game\/[^/]+\/resources\/.*\.(txt|ini|npc)$/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "game-script-cache",
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 500, maxAgeSeconds: 24 * 60 * 60 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

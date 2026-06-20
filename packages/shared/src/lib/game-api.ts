@@ -124,6 +124,7 @@ export interface GameConfigResponse {
   uiTheme: unknown;
   /** 新剑侠情缘: Effect 叠加 Attack；月影传说/剑侠情缘2: Effect 替代 Attack */
   effectFormulaAdditive?: boolean;
+  speed?: { runSpeedFold: number };
   player: PlayerConfig;
   drop: DropConfig;
   magicExp?: MagicExpConfig;

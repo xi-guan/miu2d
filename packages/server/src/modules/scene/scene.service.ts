@@ -308,10 +308,15 @@ export class SceneService {
 
     if (!row) return null;
     const data = row.data as SceneData | null;
+    const npcEntries = data?.npc ? Object.entries(data.npc) : [];
     const npcData =
       data?.npc?.[npcKey] ??
       data?.npc?.[npcKey.toLowerCase()] ??
-      Object.entries(data?.npc ?? {}).find(([k]) => k.toLowerCase() === npcKey.toLowerCase())?.[1];
+      npcEntries.find(([k]) => k.toLowerCase() === npcKey.toLowerCase())?.[1] ??
+      // fallback: engine derives the npc filename from the (chinese) map name
+      // (e.g. "沙漠之战.npc"), but sword2 names npc files by pinyin ("smzz.npc").
+      // when there's exactly one npc file in the scene, it's unambiguous — use it.
+      (npcEntries.length === 1 ? npcEntries[0][1] : undefined);
     if (npcData?.entries) {
       return npcData.entries;
     }
@@ -339,10 +344,13 @@ export class SceneService {
 
     if (!row) return null;
     const data = row.data as SceneData | null;
+    const objEntries = data?.obj ? Object.entries(data.obj) : [];
     const objData =
       data?.obj?.[objKey] ??
       data?.obj?.[objKey.toLowerCase()] ??
-      Object.entries(data?.obj ?? {}).find(([k]) => k.toLowerCase() === objKey.toLowerCase())?.[1];
+      objEntries.find(([k]) => k.toLowerCase() === objKey.toLowerCase())?.[1] ??
+      // fallback: same map-name vs pinyin-filename mismatch as npc (see getNpcEntriesBySlug)
+      (objEntries.length === 1 ? objEntries[0][1] : undefined);
     if (objData?.entries) {
       return objData.entries;
     }

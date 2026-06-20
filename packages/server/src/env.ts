@@ -44,7 +44,7 @@ export const env = {
   databaseUrl: str("DATABASE_URL"),
 
   // ---------- S3 / MinIO ----------
-  s3Endpoint: str("S3_ENDPOINT", "http://localhost:9100"),
+  s3Endpoint: str("S3_ENDPOINT", "http://localhost:9110"),
   s3Region: str("S3_REGION", "us-east-1"),
   s3AccessKey: str("MINIO_ROOT_USER", "minio"),
   s3SecretKey: str("MINIO_ROOT_PASSWORD", "minio123"),

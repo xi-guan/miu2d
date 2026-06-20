@@ -120,7 +120,8 @@ export class Player extends PlayerCombat {
    * handles thew consumption when running
    */
   protected override updateRunning(deltaTime: number): void {
-    const result = this.moveAlongPath(deltaTime, RUN_SPEED_FOLD);
+    const speedFold = getGameConfig()?.speed?.runSpeedFold ?? RUN_SPEED_FOLD;
+    const result = this.moveAlongPath(deltaTime, speedFold);
 
     // Consume thew while running
     if (result.moved && !result.reachedDestination && this.path.length > 0) {

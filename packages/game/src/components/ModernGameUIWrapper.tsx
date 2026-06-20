@@ -11,6 +11,17 @@ import type { Npc } from "@miu2d/engine/npc/npc";
 import { EquipPosition, GoodKind } from "@miu2d/engine/player/goods/good";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  HiOutlineAcademicCap,
+  HiOutlineChartBar,
+  HiOutlineCog6Tooth,
+  HiOutlineDocumentText,
+  HiOutlineShieldCheck,
+  HiOutlineShoppingBag,
+  HiOutlineSparkles,
+  HiOutlineUserGroup,
+} from "react-icons/hi2";
 import { GameUIContext } from "../contexts";
 import { EngineWatermark } from "./common/EngineWatermark";
 import type { BottomMagicDragData, GameUILogic, MagicDragData } from "./hooks";
@@ -44,7 +55,6 @@ import {
   SelectionUI,
   StatePanel,
   TimerDisplay,
-  TopBar,
   XiuLianPanel,
 } from "./ui/modern";
 import type { EquipSlotType, EquipSlots } from "./ui/classic/EquipGui";
@@ -395,8 +405,8 @@ export const ModernGameUIWrapper: React.FC<ModernGameUIWrapperProps> = ({
           overflow: "hidden",
         }}
       >
-        {/* 顶部按钮栏 */}
-        <TopBar />
+        {/* 顶部面板图标：通过 Portal 投递进 GameTopBar 中间区（与调试/截图/存档/设置合并为一条顶栏） */}
+        <ToolbarPanelButtons togglePanel={togglePanel} panels={panels} />
 
         {/* 计时器 */}
         {timerState.isRunning && !timerState.isHidden && <TimerDisplay timerState={timerState} />}
@@ -813,5 +823,51 @@ export const ModernGameUIWrapper: React.FC<ModernGameUIWrapperProps> = ({
         <EngineWatermark />
       </div>
     </GameUIContext.Provider>
+  );
+};
+
+/**
+ * 顶栏面板图标（状态/装备/伙伴/修炼/物品/武功/任务/系统）。
+ * togglePanel 来自 GameUIContext（Provider 内），通过 Portal 投递进页面级 GameTopBar
+ * 的中间挂载点 #game-toolbar-panels，实现两条顶栏合并为一条。
+ */
+const ToolbarPanelButtons: React.FC<{
+  togglePanel: (panel: PanelType) => void;
+  panels?: Record<string, boolean>;
+}> = ({ togglePanel, panels }) => {
+  const mount =
+    typeof document !== "undefined" ? document.getElementById("game-toolbar-panels") : null;
+  if (!mount) return null;
+
+  const buttons: { id: string; panel: PanelType; label: string; icon: React.ReactNode }[] = [
+    { id: "state", panel: "state", label: "状态", icon: <HiOutlineChartBar /> },
+    { id: "equip", panel: "equip", label: "装备", icon: <HiOutlineShieldCheck /> },
+    { id: "partner", panel: "npcEquip", label: "伙伴", icon: <HiOutlineUserGroup /> },
+    { id: "xiulian", panel: "xiulian", label: "修炼", icon: <HiOutlineAcademicCap /> },
+    { id: "goods", panel: "goods", label: "物品", icon: <HiOutlineShoppingBag /> },
+    { id: "magic", panel: "magic", label: "武功", icon: <HiOutlineSparkles /> },
+    { id: "memo", panel: "memo", label: "任务", icon: <HiOutlineDocumentText /> },
+    { id: "system", panel: "system", label: "系统", icon: <HiOutlineCog6Tooth /> },
+  ];
+
+  return createPortal(
+    <>
+      {buttons.map((btn) => (
+        <button
+          key={btn.id}
+          onClick={() => togglePanel(btn.panel)}
+          className={`h-8 w-8 flex items-center justify-center rounded-md text-base transition-all duration-150
+            ${
+              panels?.[btn.panel]
+                ? "bg-white/15 text-white"
+                : "text-white/70 hover:text-white hover:bg-white/10"
+            }`}
+          title={btn.label}
+        >
+          {btn.icon}
+        </button>
+      ))}
+    </>,
+    mount
   );
 };

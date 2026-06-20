@@ -15,7 +15,7 @@ type GameTab = "sword1" | "yuying" | "sword2";
 
 const GAME_TABS: { key: GameTab; slug: string }[] = [
   { key: "sword1", slug: "sword1" },
-  { key: "yuying", slug: "demo" },
+  { key: "yuying", slug: "yuying" },
   { key: "sword2", slug: "sword2" },
 ];
 

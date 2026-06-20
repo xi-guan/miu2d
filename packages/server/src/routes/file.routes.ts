@@ -3,16 +3,54 @@
  *
  * 提供 /game/:gameSlug/resources/* 路径的公开访问
  * 用于游戏客户端直接加载资源文件
+ *
+ * 开发模式回退：MinIO 无文件时从本地 resources/ 目录读取
  */
+
+import { fileURLToPath } from "node:url";
 
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { db } from "../db/client";
 import * as s3 from "../storage/s3";
 import { resolveFilePath } from "../utils/file";
 import { Logger } from "../utils/logger";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const logger = new Logger("FileRoutes");
+const RESOURCE_ROOT = path.resolve(__dirname, "../../../..", "resources");
+
+const MIME_TYPES: Record<string, string> = {
+  ".asf": "application/octet-stream",
+  ".msf": "application/octet-stream",
+  ".map": "application/octet-stream",
+  ".mmf": "application/octet-stream",
+  ".shd": "application/octet-stream",
+  ".xnb": "application/octet-stream",
+  ".ogg": "audio/ogg",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".webm": "video/webm",
+  ".ini": "text/plain",
+  ".txt": "text/plain",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".json": "application/json",
+  ".lua": "text/plain",
+  ".npc": "text/plain",
+};
+
+function detectMimeType(filePath: string): string | null {
+  const ext = path.extname(filePath).toLowerCase();
+  return MIME_TYPES[ext] ?? null;
+}
 
 export const fileRoutes = new Hono();
 
@@ -47,46 +85,77 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
     const pathSegments = filePath.split("/").filter(Boolean);
     const file = await resolveFilePath(game.id, pathSegments);
 
-    if (!file) {
+    if (file) {
+      if (file.type !== "file" || !file.storageKey) {
+        return c.json({ error: "Path is not a file" }, 400);
+      }
+
+      // 3. 从 S3 获取文件流
+      const ifNoneMatch = c.req.header("if-none-match");
+      const {
+        stream: fileStream,
+        contentType,
+        contentLength,
+        etag,
+        notModified,
+      } = await s3.getFileStream(file.storageKey, ifNoneMatch);
+
+      if (notModified) {
+        c.header("Cache-Control", "no-cache");
+        if (etag) c.header("ETag", etag);
+        return c.body(null, 304);
+      }
+
+      // 4. 设置响应头
+      c.header("Content-Type", file.mimeType || contentType || "application/octet-stream");
+      if (contentLength !== undefined) {
+        c.header("Content-Length", String(contentLength));
+      }
+      c.header("Cache-Control", "no-cache");
+      if (etag) c.header("ETag", etag);
+
+      // 5. 流式传输
+      return stream(c, async (s) => {
+        for await (const chunk of fileStream) {
+          await s.write(chunk as Uint8Array);
+        }
+      });
+    }
+
+    // 6. 开发回退：从本地 resources/<gameSlug>/ 目录读取（MinIO 无文件时）
+    const relativePath = pathSegments.join("/");
+    const gameResourceRoot = path.join(RESOURCE_ROOT, gameSlug);
+    let localPath = path.join(gameResourceRoot, relativePath);
+    // 防止路径遍历攻击
+    if (!localPath.startsWith(gameResourceRoot)) {
+      return c.json({ error: "Invalid path" }, 403);
+    }
+
+    // MSF/MPC 路径兼容：引擎期望 msf/map/... 但本地文件在 mpc/map/...
+    const needsMpcFallback =
+      relativePath.startsWith("msf/map/") && !fs.existsSync(localPath);
+    if (needsMpcFallback) {
+      const fallbackPath = "mpc" + relativePath.slice(3); // msf → mpc
+      localPath = path.join(gameResourceRoot, fallbackPath);
+    }
+
+    if (!fs.existsSync(localPath)) {
       return c.json({ error: "File not found" }, 404);
     }
 
-    if (file.type !== "file" || !file.storageKey) {
-      return c.json({ error: "Path is not a file" }, 400);
-    }
-
-    // 3. 从 S3 获取文件流（流式传输，不加载到内存），支持 ETag 条件请求
-    const ifNoneMatch = c.req.header("if-none-match");
-    const {
-      stream: fileStream,
-      contentType,
-      contentLength,
-      etag,
-      notModified,
-    } = await s3.getFileStream(file.storageKey, ifNoneMatch);
-
-    // 304 Not Modified — 文件内容未变化，不需要重新传输
-    if (notModified) {
-      c.header("Cache-Control", "no-cache");
-      if (etag) c.header("ETag", etag);
-      return c.body(null, 304);
-    }
-
-    // 4. 设置响应头
-    c.header("Content-Type", file.mimeType || contentType || "application/octet-stream");
-    if (contentLength !== undefined) {
-      c.header("Content-Length", String(contentLength));
-    }
-    // no-cache: 允许缓存，但每次必须向服务器验证 (ETag)，文件未变时返回 304
+    c.header("Content-Type", detectMimeType(localPath) || "application/octet-stream");
     c.header("Cache-Control", "no-cache");
-    if (etag) c.header("ETag", etag);
 
-    // 5. 流式传输文件内容
-    return stream(c, async (s) => {
-      for await (const chunk of fileStream) {
-        await s.write(chunk as Uint8Array);
-      }
-    });
+    const fileStream = fs.createReadStream(localPath);
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          fileStream.on("data", (chunk: Buffer) => controller.enqueue(chunk));
+          fileStream.on("end", () => controller.close());
+          fileStream.on("error", (err) => controller.error(err));
+        },
+      }),
+    );
   } catch (error) {
     logger.error("[getResource] Error:", error);
     return c.json({ error: "Internal server error" }, 500);

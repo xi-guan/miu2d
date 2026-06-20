@@ -2,6 +2,7 @@ services:
   # PostgreSQL 数据库
   db:
     image: postgres:16
+    platform: linux/arm64
     container_name: miu2d-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -22,13 +23,14 @@ services:
   # MinIO 文件存储 (S3 兼容)
   minio:
     image: minio/minio:latest
+    platform: linux/arm64
     container_name: miu2d-minio
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
     command: server /data --console-address ":9001"
     ports:
-      - "9100:9000"   # API
+      - "9110:9000"   # API
       - "9101:9001"   # Console
     volumes:
       - ./.data/minio:/data
@@ -43,6 +45,7 @@ services:
   # 后端服务 (生产环境用)
   server:
     image: miu2d-server:latest
+    platform: linux/arm64
     container_name: miu2d-server
     build:
       context: .
@@ -72,6 +75,7 @@ services:
   # 前端服务 (生产环境用)
   web:
     image: miu2d-web:latest
+    platform: linux/arm64
     container_name: miu2d-web
     build:
       context: .

@@ -73,8 +73,17 @@ fn read_gbk_string(data: &[u8], offset: usize, max_len: usize) -> String {
     if len == 0 {
         return String::new();
     }
-    let (decoded, _, _) = GBK.decode(&data[offset..offset + len]);
-    decoded.into_owned()
+    let bytes = &data[offset..offset + len];
+    // Some sources (e.g. jxqy2-assets) ship .map already transcoded to UTF-8 while the
+    // original format is GBK. Try UTF-8 first, fall back to GBK — same policy as the
+    // Traps.ini reader below. Decoding UTF-8 bytes as GBK would corrupt tile names.
+    match std::str::from_utf8(bytes) {
+        Ok(s) => s.to_string(),
+        Err(_) => {
+            let (decoded, _, _) = GBK.decode(bytes);
+            decoded.into_owned()
+        }
+    }
 }
 
 fn parse_old_map(data: &[u8]) -> Option<OldMapData> {

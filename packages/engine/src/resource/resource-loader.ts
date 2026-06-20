@@ -1067,6 +1067,13 @@ class ResourceLoaderImpl {
           this.parsedCache.delete(key);
         }
       }
+      // 同时清除该类型的失败缓存（loadParsed 用带前缀的 cacheKey 记失败），
+      // 否则改好脚本后 failedPaths 仍命中、永久 return null、不再请求
+      for (const key of this.failedPaths) {
+        if (key.startsWith(prefix)) {
+          this.failedPaths.delete(key);
+        }
+      }
     }
     this.updateCacheStats();
   }

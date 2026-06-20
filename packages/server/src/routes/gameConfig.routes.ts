@@ -102,14 +102,16 @@ gameConfigRoutes.get(":gameSlug/api/manifest", async (c) => {
     const icons: Array<{ src: string; sizes: string; type: string; purpose: "any" | "maskable" }> =
       hasLogo
         ? ([512, 192] as const).flatMap((size) => [
+            // Use the server logo route (reads from private MinIO) — NOT a raw /s3 key,
+            // which 403s because the bucket is private and the URL is unsigned.
             {
-              src: s3.getPublicFileUrl(logoSizedKey(game.id, size)),
+              src: `/game/${gameSlug}/api/logo/${size}`,
               sizes: `${size}x${size}`,
               type: "image/png",
               purpose: "any" as const,
             },
             {
-              src: s3.getPublicFileUrl(logoSizedKey(game.id, size)),
+              src: `/game/${gameSlug}/api/logo/${size}`,
               sizes: `${size}x${size}`,
               type: "image/png",
               purpose: "maskable" as const,
@@ -199,7 +201,11 @@ gameConfigRoutes.get(":gameSlug/api/logo/:size", async (c) => {
       }
     });
   } catch (error) {
-    if (error instanceof Error && error.name === "NoSuchKey") {
+    // logo not yet uploaded → MinIO 404; SDK may throw NoSuchKey or an
+    // xml-deserialization error whose $metadata still carries httpStatusCode 404
+    const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata
+      ?.httpStatusCode;
+    if ((error instanceof Error && error.name === "NoSuchKey") || status === 404) {
       return c.json({ error: "Logo not found" }, 404);
     }
     logger.error("[getLogoSized] Error:", error);
