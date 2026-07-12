@@ -1,5 +1,6 @@
 {
   "name": "@miu2d/ui",
+  "description": "Reusable UI component library (buttons, icons, layout)",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",

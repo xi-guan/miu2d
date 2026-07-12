@@ -329,27 +329,29 @@ Also included: `resources/` (game assets), `docs/` (format specs), `JxqyHD/` (C#
 git clone https://github.com/nicologies/miu2d.git
 cd miu2d
 pnpm install
-pnpm dev            # → http://localhost:5173
+pnpm dev            # → http://localhost:5274
 ```
 
 ### Full Stack (with backend + database)
 
 ```bash
-make init           # Docker: PostgreSQL + MinIO, migrate, seed
-make dev            # web + server + db studio concurrently
+just setup          # deps, prisma client, .env files
+just db up          # Docker: PostgreSQL + MinIO
+just db migrate     # apply database migrations
+just dev            # web + server concurrently
 ```
 
 ### Commands
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm dev` | Frontend dev server (port 5173) |
-| `make dev` | Full-stack dev (web + server + db) |
-| `make tsc` | Type check all packages |
+| `pnpm dev` | Frontend dev server (port 5274) |
+| `just dev` | Full-stack dev (web + server + db) |
+| `pnpm tsc` | Type check all packages |
 | `pnpm lint` | Biome lint |
-| `make test` | Run engine tests (vitest) |
-| `make convert` | Batch convert game resources (Rust CLI) |
-| `make convert-verify` | Pixel-perfect conversion verification |
+| `pnpm --filter @miu2d/engine test` | Run engine tests (vitest) |
+| `just convert` | Batch convert game resources (Rust CLI) |
+| `just convert-verify` | Pixel-perfect conversion verification |
 
 ---
 
@@ -392,7 +394,7 @@ See [deploy/](deploy/) for production Docker configs.
 ## Contributing
 
 1. Fork → feature branch → reference the [dev guide](.github/copilot-instructions.md) → PR
-2. Run `make tsc` and `pnpm lint` before submitting
+2. Run `pnpm tsc` and `pnpm lint` before submitting
 
 ---
 

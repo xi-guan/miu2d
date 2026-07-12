@@ -24,7 +24,7 @@ const __dirname = path.dirname(__filename);
 // 所以我们直接内联 parseIni + 各 parse 函数的调用
 
 // parseIni is a pure function, import it directly
-import { convertIniToTheme } from "../packages/dashboard/src/lib/ui-settings-legacy";
+import { convertIniToTheme } from "../../packages/dashboard/src/lib/ui-settings-legacy";
 
 function convertFile(iniPath: string, outputPath?: string): void {
   const resolvedIni = path.resolve(iniPath);
@@ -69,7 +69,7 @@ function main(): void {
   }
 
   if (args[0] === "--all") {
-    const demoDir = path.resolve(__dirname, "../ui_demo");
+    const demoDir = path.resolve(__dirname, "../../ui_demo");
     if (!fs.existsSync(demoDir)) {
       console.error(`Error: ui_demo/ directory not found`);
       process.exit(1);

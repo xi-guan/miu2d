@@ -1,5 +1,6 @@
 {
   "name": "@miu2d/game",
+  "description": "In-game React UI: HUD, menus, dialogs, inventory",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",

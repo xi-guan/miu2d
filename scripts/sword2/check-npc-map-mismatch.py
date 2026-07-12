@@ -14,7 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).parent.parent.parent
 
 DEFAULT_RESOURCES = [
     "resources-sword2-new",

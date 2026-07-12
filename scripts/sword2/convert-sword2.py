@@ -2319,7 +2319,7 @@ def main():
     DRY_RUN = args.dry_run
 
     # Resolve paths relative to workspace root
-    workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    workspace = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     src = os.path.join(workspace, args.src)
     dst = os.path.join(workspace, args.dst)
 

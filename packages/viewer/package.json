@@ -1,5 +1,6 @@
 {
   "name": "@miu2d/viewer",
+  "description": "Resource viewer components: maps, sprites, animations",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",

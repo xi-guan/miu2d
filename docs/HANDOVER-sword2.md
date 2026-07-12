@@ -104,7 +104,7 @@ initialMap=沙漠之战 已设
   已是 UTF-8(jxqy2-assets 源转过码) → tile 名被当 GBK 解成乱码(沙漠→娌欐紶)写进 mmf →
   引擎请求乱码路径 404。月影 .map 是 GBK 所以正常,差异在此(已实测: sword2 .map 31 UTF-8/27 ascii,
   月影 24 GBK)。
-  修复: `packages/converter/src/bin/map2mmf.rs` read_gbk_string + `scripts/convert-sword2.py`
+  修复: `packages/converter/src/bin/map2mmf.rs` read_gbk_string + `scripts/sword2/convert-sword2.py`
   step_map_tiles(第~2119行)都改"先试 UTF-8 再回退 GBK"(与同文件 Traps.ini 一致)。
   重编译 → 重跑 map2mmf(58 mmf,tile 名已正确 UTF-8) → step_map_tiles(复制 tile 到
   msf/map/<场景>/, 3382个) → 重导 scene 入库。tile 路径 curl 全 200。
@@ -144,7 +144,7 @@ sword2  tile (msf/map/沙漠之战/ground-沙漠.msf): canvas=8x100 dir=0 frames
 
 ## 遗留项2: sword1(新剑侠情缘)
 - 素材锁在 8 个 .pak 里 (`games-raw/xinjianxiaqingyuan/data/*.pak`: asf.pak 312M 等)
-- `scripts/unpack-pak.py` 解不了它: sword1 的 pak 格式与脚本假设不同
+- `scripts/sword2/unpack-pak.py` 解不了它: sword1 的 pak 格式与脚本假设不同
   (dump 显示无独立名表, offset 直指数据, 数据块前有4字节长度头)
 - 用户决定: 找"不解pak的方法"(如GitHub现成已解包素材仓,类比sword2来自Upwinded/jxqy2-assets) — 未开始
 

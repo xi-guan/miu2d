@@ -4,7 +4,7 @@
 
 用法: python scripts/extract-and-upscale-icon.py [--scale 4] [--exe Jxqy.exe]
 
-输出目录: scripts/icons/
+输出目录: scripts/training/icons/
   - original/   原始提取图标
   - upscaled/   放大后的图标
 """
@@ -277,8 +277,8 @@ def main():
     )
     parser.add_argument(
         "--output",
-        default="scripts/icons",
-        help="输出目录 (默认: scripts/icons)",
+        default="scripts/training/icons",
+        help="输出目录 (默认: scripts/training/icons)",
     )
     args = parser.parse_args()
 

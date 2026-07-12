@@ -13,7 +13,7 @@ import zstandard as zstd
 from PIL import Image
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "magic", "_training_data")
 
 # 根据文件名推断类型和描述词

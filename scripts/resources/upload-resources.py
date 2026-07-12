@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 API = "http://localhost:4100"
 EMAIL = "admin@example.com"
 PASSWORD = "password"
-RESOURCES_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
+RESOURCES_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "resources"))
 BATCH = 50          # files per prepare call
 PUT_WORKERS = 8     # concurrent PUTs
 

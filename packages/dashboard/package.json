@@ -1,5 +1,6 @@
 {
   "name": "@miu2d/dashboard",
+  "description": "Admin dashboard: game management, resource import, editors",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",

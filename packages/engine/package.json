@@ -1,5 +1,6 @@
 {
   "name": "@miu2d/engine",
+  "description": "Core 2D game engine: rendering, map, combat, NPC AI, scripting, saves",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",

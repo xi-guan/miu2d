@@ -22,6 +22,9 @@ const _batchBuckets: number[][] = [];
 export interface MpcAtlas {
   canvas: HTMLCanvasElement;
   rects: { x: number; y: number; w: number; h: number }[];
+  /** 贴图底部锚点（MSF 头 anchor_y）：tile 从锚点向上绘制 bottom 像素。
+   *  挂墙装饰（字画/蓑衣）锚点大、地砖锚点≈height-16，正确的锚点让两者各就其位。 */
+  bottom: number;
 }
 
 export interface MapRenderer {
@@ -86,7 +89,7 @@ function createMpcAtlas(mpc: Mpc): MpcAtlas {
     const c = document.createElement("canvas");
     c.width = 1;
     c.height = 1;
-    return { canvas: c, rects: [] };
+    return { canvas: c, rects: [], bottom: mpc.head.bottom };
   }
 
   // 使用行式排列：所有帧横向排列
@@ -128,7 +131,7 @@ function createMpcAtlas(mpc: Mpc): MpcAtlas {
     (frame as { imageData: ImageData | null }).imageData = null!;
   }
 
-  return { canvas, rects };
+  return { canvas, rects, bottom: mpc.head.bottom };
 }
 
 /**
@@ -213,8 +216,9 @@ export function renderMapToOffscreen(mapRenderer: MapRenderer): HTMLCanvasElemen
         const rect = atlas.rects[frame];
         const px = (r % 2) * 32 + 64 * c;
         const py = 16 * r;
+        const anchorY = false ? atlas.bottom - 16 : rect.h - 16; // TEMP: 回退验证黑块来源
         const drawX = Math.floor(px - rect.w / 2 + offX);
-        const drawY = Math.floor(py - (rect.h - 16) + offY);
+        const drawY = Math.floor(py - anchorY + offY);
 
         ctx.drawImage(
           atlas.canvas,
@@ -424,7 +428,12 @@ function drawTileLayer(
   const rect = atlas.rects[frame];
   tileToPixel(col, row, _tempPos);
   const drawX = Math.floor(_tempPos.x - rect.w / 2 - mapRenderer.camera.x);
-  const drawY = Math.floor(_tempPos.y - (rect.h - 16) - mapRenderer.camera.y);
+  // MSF 锚点 bottom 是「贴图底边到行基线」的距离；绘制基线在行中心（上移 16）。
+  // 地砖 bottom==height → bottom-16 == rect.h-16（行为不变）；
+  // 挂墙/立体 bottom>height → 多上抬，贴图回到墙面。
+  // bottom 缺失（旧数据=0）时回退几何默认 rect.h-16。
+  const anchorY = false ? atlas.bottom - 16 : rect.h - 16; // TEMP: 回退验证黑块来源
+  const drawY = Math.floor(_tempPos.y - anchorY - mapRenderer.camera.y);
 
   renderer.drawSourceEx(atlas.canvas, drawX, drawY, {
     srcX: rect.x,
@@ -526,9 +535,10 @@ export function getTileTextureRegion(
 
   const rect = atlas.rects[frame];
   tileToPixel(col, row, _tempPos);
+  const anchorY = false ? atlas.bottom - 16 : rect.h - 16; // TEMP: 回退验证黑块来源
   return {
     x: _tempPos.x - rect.w / 2,
-    y: _tempPos.y - (rect.h - 16),
+    y: _tempPos.y - anchorY,
     width: rect.w,
     height: rect.h,
   };

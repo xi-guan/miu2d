@@ -330,27 +330,29 @@ pnpm monorepo 中的 11 个包，总计约 **176,000 行**代码：
 git clone https://github.com/nicologies/miu2d.git
 cd miu2d
 pnpm install
-pnpm dev            # → http://localhost:5173
+pnpm dev            # → http://localhost:5274
 ```
 
 ### 全栈启动（含后端 + 数据库）
 
 ```bash
-make init           # Docker: PostgreSQL + MinIO, 迁移, 种子数据
-make dev            # 同时启动 web + server + db studio
+just setup          # 依赖、Prisma Client、.env 文件
+just db up          # Docker: PostgreSQL + MinIO
+just db migrate     # 执行数据库迁移
+just dev            # 同时启动 web + server
 ```
 
 ### 常用命令
 
 | 命令 | 用途 |
 |------|------|
-| `pnpm dev` | 前端开发服务器（端口 5173） |
-| `make dev` | 全栈开发（web + server + db） |
-| `make tsc` | 全包类型检查 |
+| `pnpm dev` | 前端开发服务器（端口 5274） |
+| `just dev` | 全栈开发（web + server + db） |
+| `pnpm tsc` | 全包类型检查 |
 | `pnpm lint` | Biome 代码检查 |
-| `make test` | 运行引擎测试（vitest） |
-| `make convert` | 批量转换游戏资源（Rust CLI） |
-| `make convert-verify` | 像素级转换验证 |
+| `pnpm --filter @miu2d/engine test` | 运行引擎测试（vitest） |
+| `just convert` | 批量转换游戏资源（Rust CLI） |
+| `just convert-verify` | 像素级转换验证 |
 
 ---
 
@@ -393,7 +395,7 @@ make dev            # 同时启动 web + server + db studio
 ## 参与贡献
 
 1. Fork → 功能分支 → 参考[开发指南](.github/copilot-instructions.md) → PR
-2. 提交前运行 `make tsc` 和 `pnpm lint`
+2. 提交前运行 `pnpm tsc` 和 `pnpm lint`
 
 ---
 

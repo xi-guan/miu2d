@@ -1,5 +1,6 @@
 {
   "name": "@miu2d/types",
+  "description": "Shared TypeScript type definitions used by all packages",
   "version": "0.0.0",
   "private": true,
   "type": "module",

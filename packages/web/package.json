@@ -1,5 +1,6 @@
 {
   "name": "@miu2d/web",
+  "description": "Web app shell: routing, PWA, bundles game + dashboard",
   "private": true,
   "version": "0.0.0",
   "type": "module",

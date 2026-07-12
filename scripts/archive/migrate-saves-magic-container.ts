@@ -3,14 +3,14 @@
  * 转换为新格式（magicContainer/goodsContainer）
  *
  * 用法：
- *   cd packages/server && pnpm tsx ../../scripts/migrate-saves-magic-container.ts
+ *   cd packages/server && pnpm tsx ../../scripts/archive/migrate-saves-magic-container.ts
  */
 
 import { Pool } from "pg";
 import dotenv from "dotenv";
 import path from "node:path";
 
-dotenv.config({ path: path.resolve(__dirname, "../packages/server/.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../packages/server/.env") });
 
 interface OldMagicItem {
   fileName: string;

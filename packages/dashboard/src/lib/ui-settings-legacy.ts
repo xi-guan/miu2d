@@ -3,7 +3,7 @@
  *
  * 仅用于：
  * - 批量导入 (ImportAllModal) 从 ZIP 中读取 INI 并转换
- * - 转换脚本 (scripts/convert-ini-to-theme.ts)
+ * - 转换脚本 (scripts/archive/convert-ini-to-theme.ts)
  *
  * 运行时不使用此文件，游戏仅使用 ui-settings.ts 中的 UiTheme + resolveTheme()
  */

@@ -83,7 +83,7 @@ uv pip install \
 分析 MPC 文件调色板和帧 RLE 编码。
 
 ```bash
-python3 scripts/analyze_mpc_file.py resources-sword2/Mpc/magic/白虹贯日.mpc
+python3 scripts/resources/analyze_mpc_file.py resources-sword2/Mpc/magic/白虹贯日.mpc
 ```
 
 **依赖**：无（stdlib only）
@@ -95,7 +95,7 @@ python3 scripts/analyze_mpc_file.py resources-sword2/Mpc/magic/白虹贯日.mpc
 检查 MSF 文件的透明度通道信息。
 
 ```bash
-python3 scripts/check_msf_alpha.py resources-sword2-new/asf/magic/白虹贯日.msf
+python3 scripts/resources/check_msf_alpha.py resources-sword2-new/asf/magic/白虹贯日.msf
 ```
 
 **依赖**：无（stdlib only）
@@ -108,7 +108,7 @@ python3 scripts/check_msf_alpha.py resources-sword2-new/asf/magic/白虹贯日.m
 
 ```bash
 # 在项目根目录执行
-python3 scripts/check-alpha.py
+python3 scripts/resources/check-alpha.py
 ```
 
 **依赖**：`base`（Pillow + numpy）
@@ -121,16 +121,16 @@ python3 scripts/check-alpha.py
 
 ```bash
 # 预览（不实际修改）
-python3 scripts/convert-sword2.py --dry-run
+python3 scripts/sword2/convert-sword2.py --dry-run
 
 # 完整转换
-python3 scripts/convert-sword2.py
+python3 scripts/sword2/convert-sword2.py
 
 # 只运行指定步骤
-python3 scripts/convert-sword2.py --steps encoding,npc_fields,magic
+python3 scripts/sword2/convert-sword2.py --steps encoding,npc_fields,magic
 
 # 跳过 Rust 转换器（只做 Python 处理）
-python3 scripts/convert-sword2.py --no-rust
+python3 scripts/sword2/convert-sword2.py --no-rust
 ```
 
 **依赖**：无（stdlib only，Rust 转换器为可选）
@@ -142,7 +142,7 @@ python3 scripts/convert-sword2.py --no-rust
 解码 MSF 文件帧，导出为带 caption 的 PNG，用于 LoRA 训练数据集。
 
 ```bash
-python3 scripts/export-training-data.py
+python3 scripts/training/export-training-data.py
 # 输出目录：magic/_training_data/
 ```
 
@@ -155,8 +155,8 @@ python3 scripts/export-training-data.py
 从 `Jxqy.exe` 提取图标资源，并用 Real-ESRGAN 超分辨率放大（2×/4×/8×）。
 
 ```bash
-python3 scripts/extract-and-upscale-icon.py --exe Jxqy.exe --scale 4
-# 输出：scripts/icons/original/ 和 scripts/icons/upscaled/
+python3 scripts/training/extract-and-upscale-icon.py --exe Jxqy.exe --scale 4
+# 输出：scripts/training/icons/original/ 和 scripts/training/icons/upscaled/
 ```
 
 **依赖**：`ai`（torch CUDA + basicsr + realesrgan + pefile）
@@ -170,13 +170,13 @@ python3 scripts/extract-and-upscale-icon.py --exe Jxqy.exe --scale 4
 ```bash
 # Step 1：准备训练数据（需先运行 export-training-data.py）
 # Step 2：训练 LoRA（约 30-60 分钟，RTX 4080）
-python3 scripts/train-lora-magic.py train
+python3 scripts/training/train-lora-magic.py train
 
 # Step 3：生成新武功图
-python3 scripts/train-lora-magic.py generate
+python3 scripts/training/train-lora-magic.py generate
 
 # Step 4：生成全套魔法图集
-python3 scripts/train-lora-magic.py generate-all
+python3 scripts/training/train-lora-magic.py generate-all
 ```
 
 **依赖**：`lora`（torch CUDA + diffusers + peft + transformers + accelerate + bitsandbytes）

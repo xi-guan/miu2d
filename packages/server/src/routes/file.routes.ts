@@ -150,9 +150,35 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
     return new Response(
       new ReadableStream({
         start(controller) {
-          fileStream.on("data", (chunk: Buffer) => controller.enqueue(chunk));
-          fileStream.on("end", () => controller.close());
-          fileStream.on("error", (err) => controller.error(err));
+          // 客户端可能中途断开（切歌、SW 取消请求），此时 controller 已关闭，
+          // 但 fileStream 仍会 emit data → enqueue 抛 ERR_INVALID_STATE。
+          // 该异常发生在 stream event handler 中无人捕获，会直接 crash 整个进程。
+          // 用 closed 标志守护所有 controller 操作，避免对已关闭流操作。
+          let closed = false;
+          fileStream.on("data", (chunk: Buffer) => {
+            if (closed) return;
+            try {
+              controller.enqueue(chunk);
+            } catch {
+              // controller 已被下游关闭，停止读取并销毁文件流
+              closed = true;
+              fileStream.destroy();
+            }
+          });
+          fileStream.on("end", () => {
+            if (closed) return;
+            closed = true;
+            controller.close();
+          });
+          fileStream.on("error", (err) => {
+            if (closed) return;
+            closed = true;
+            controller.error(err);
+          });
+        },
+        // 客户端断开连接时触发：销毁文件流，释放 fd
+        cancel() {
+          fileStream.destroy();
         },
       }),
     );

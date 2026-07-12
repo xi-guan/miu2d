@@ -17,7 +17,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).parent.parent.parent
 
 # 默认扫描的资源目录列表
 DEFAULT_RESOURCES = [

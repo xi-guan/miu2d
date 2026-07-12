@@ -2,7 +2,7 @@
 import { deflateSync } from "node:zlib";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import initWasm, { decode_msf_individual_frames, parse_msf_header } from "../packages/engine-wasm/pkg/miu2d_engine_wasm.js";
+import initWasm, { decode_msf_individual_frames, parse_msf_header } from "../../packages/engine-wasm/pkg/miu2d_engine_wasm.js";
 
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 2) {
@@ -17,7 +17,7 @@ if (!input || !output) {
   process.exit(1);
 }
 
-const wasmBytes = await readFile(new URL("../packages/engine-wasm/pkg/miu2d_engine_wasm_bg.wasm", import.meta.url));
+const wasmBytes = await readFile(new URL("../../packages/engine-wasm/pkg/miu2d_engine_wasm_bg.wasm", import.meta.url));
 await initWasm({ module_or_path: wasmBytes });
 
 const data = new Uint8Array(await readFile(input));

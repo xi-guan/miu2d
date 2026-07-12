@@ -35,7 +35,7 @@ import zstandard as zstd
 from PIL import Image
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
-PROJECT_ROOT = SCRIPT_DIR.parent
+PROJECT_ROOT = SCRIPT_DIR.parent.parent
 TRAINING_DIR = PROJECT_ROOT / "magic" / "_training_data"
 LORA_OUTPUT = PROJECT_ROOT / "magic" / "_lora_model"
 MAGIC_OUTPUT = PROJECT_ROOT / "magic"

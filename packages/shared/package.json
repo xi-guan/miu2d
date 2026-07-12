@@ -1,5 +1,6 @@
 {
   "name": "@miu2d/shared",
+  "description": "Cross-package utilities: i18n, hooks, contexts",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",

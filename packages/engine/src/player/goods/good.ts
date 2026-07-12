@@ -64,6 +64,18 @@ const EquipPositionMap: Record<EquipPositionStr, EquipPosition> = {
   Foot: EquipPosition.Foot,
 };
 
+/**
+ * 解析装备部位字符串为 EquipPosition。
+ * 容错大小写：部分导入数据的 part 是小写（如 "body"），而 EquipPositionMap
+ * 的 key 是首字母大写。规范化后查找，未知值回退 None（绝不返回 undefined，
+ * 否则会作为无效 enum 流入 exchangeListItemAndEquiping 导致装备失败）。
+ */
+function parseEquipPosition(part: string | null | undefined): EquipPosition {
+  if (!part) return EquipPosition.None;
+  const normalized = (part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()) as EquipPositionStr;
+  return EquipPositionMap[normalized] ?? EquipPosition.None;
+}
+
 // ============= 缓存 =============
 
 /** 物品缓存 key -> Good */
@@ -132,7 +144,7 @@ export class Good {
     this.intro = api.intro ?? "";
     this.imagePath = api.image ? `asf/goods/${api.image}` : "";
     this.iconPath = api.icon ? `asf/goods/${api.icon}` : "";
-    this.part = api.part ? EquipPositionMap[api.part] : EquipPosition.None;
+    this.part = parseEquipPosition(api.part);
     this.script = api.script ?? "";
 
     this.life = api.life ?? 0;

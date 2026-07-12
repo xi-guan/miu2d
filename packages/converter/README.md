@@ -24,14 +24,14 @@
 
 ## 使用方式
 
-### 通过 Makefile（推荐）
+### 通过 justfile（推荐）
 
 ```bash
 # 一键转换资源（ASF/MPC/MAP/编码/视频）
-make convert
+just convert
 
 # 逐像素验证转换结果（ASF + MPC）
-make convert-verify
+just convert-verify
 ```
 
 ### 通过 pnpm
