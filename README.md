@@ -122,7 +122,7 @@ Most web game projects reach for PixiJS, Phaser, or a WASM-compiled Unity/Godot 
 | Audio | Web Audio API (OGG Vorbis) |
 | Performance | Rust → WebAssembly (wasm-bindgen, zero-copy) |
 | Backend | Hono (lightweight HTTP) · tRPC 11 · Prisma ORM |
-| Database | PostgreSQL 16 · MinIO / S3 |
+| Database | PostgreSQL 17 · RustFS / S3 |
 | Validation | Zod 4 (shared schemas across client & server) |
 | Quality | Biome (lint + format) · TypeScript strict mode |
 | Monorepo | pnpm workspaces (11 packages) |
@@ -336,7 +336,7 @@ pnpm dev            # → http://localhost:5274
 
 ```bash
 just setup          # deps, prisma client, .env files
-just db up          # Docker: PostgreSQL + MinIO
+just db up          # Docker: PostgreSQL + RustFS
 just db migrate     # apply database migrations
 just dev            # web + server concurrently
 ```
@@ -385,7 +385,7 @@ just dev            # web + server concurrently
 | Target | Method |
 |--------|--------|
 | **Frontend** | Vercel — `pnpm build:web` → static SPA |
-| **Full Stack** | Docker Compose — PostgreSQL + MinIO + Hono + Nginx |
+| **Full Stack** | Docker Compose — PostgreSQL + RustFS + Hono + Nginx |
 
 See [deploy/](deploy/) for production Docker configs.
 

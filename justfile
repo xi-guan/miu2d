@@ -18,7 +18,7 @@ setup:
     pnpm --filter @miu2d/types build
     echo "✓ setup complete"
 
-# start db + minio containers
+# start db + rustfs containers
 db verb:
     @just _db-{{verb}}
 
@@ -26,9 +26,9 @@ db verb:
 _db-up:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "→ starting db and minio"
-    docker compose up -d db minio
-    echo "✓ containers up (postgres :5533, minio api :9110 console :9101)"
+    echo "→ starting db and rustfs"
+    docker compose up -d db rustfs
+    echo "✓ containers up (postgres :5533, rustfs api :9110 console :9101)"
 
 [private]
 _db-down:

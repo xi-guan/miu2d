@@ -122,7 +122,7 @@ Miu2D 是一个 **176,000 行**的 2D ARPG 引擎，使用 TypeScript 和 Rust �
 | 音频 | Web Audio API (OGG Vorbis) |
 | 性能 | Rust → WebAssembly（wasm-bindgen，零拷贝） |
 | 后端 | Hono（轻量 HTTP 框架）· tRPC 11 · Prisma ORM |
-| 数据库 | PostgreSQL 16 · MinIO / S3 |
+| 数据库 | PostgreSQL 17 · RustFS / S3 |
 | 校验 | Zod 4（前后端共享 Schema） |
 | 代码质量 | Biome (lint + format) · TypeScript strict 模式 |
 | 项目管理 | pnpm workspaces（11 个包） |
@@ -337,7 +337,7 @@ pnpm dev            # → http://localhost:5274
 
 ```bash
 just setup          # 依赖、Prisma Client、.env 文件
-just db up          # Docker: PostgreSQL + MinIO
+just db up          # Docker: PostgreSQL + RustFS
 just db migrate     # 执行数据库迁移
 just dev            # 同时启动 web + server
 ```
@@ -386,7 +386,7 @@ just dev            # 同时启动 web + server
 | 目标 | 方式 |
 |------|------|
 | **前端** | Vercel — `pnpm build:web` → 静态 SPA |
-| **全栈** | Docker Compose — PostgreSQL + MinIO + Hono + Nginx |
+| **全栈** | Docker Compose — PostgreSQL + RustFS + Hono + Nginx |
 
 详见 [deploy/](deploy/) 目录中的生产 Docker 配置。
 
