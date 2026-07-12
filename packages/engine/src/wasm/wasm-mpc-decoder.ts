@@ -110,11 +110,20 @@ function decodeMsfAsMpc(
   const frameSizesOutput = new Uint8Array(header.frame_count * 2 * 4);
   const frameOffsetsOutput = new Uint8Array(header.frame_count * 4);
 
+  // flags bit1: frames carry per-frame canvas offsets rebased to the header
+  // anchor (IMG-converted tiles). Request them so tile rendering can place
+  // each frame at anchor + offset; passing the buffer also enables tight-crop.
+  const tileAnchored = (header.flags & 2) !== 0;
+  const canvasOffsetsOutput = tileAnchored
+    ? new Uint8Array(header.frame_count * 2 * 2)
+    : undefined;
+
   const frameCount = wasm.decode_msf_individual_frames(
     data,
     pixelOutput,
     frameSizesOutput,
-    frameOffsetsOutput
+    frameOffsetsOutput,
+    canvasOffsetsOutput
   );
 
   if (frameCount === 0) {
@@ -123,6 +132,7 @@ function decodeMsfAsMpc(
 
   const frameSizes = new Uint32Array(frameSizesOutput.buffer);
   const frameOffsets = new Uint32Array(frameOffsetsOutput.buffer);
+  const canvasOffsets = canvasOffsetsOutput ? new Int16Array(canvasOffsetsOutput.buffer) : null;
 
   const frames: MpcFrame[] = [];
   for (let i = 0; i < frameCount; i++) {
@@ -135,7 +145,17 @@ function decodeMsfAsMpc(
     pixelData.set(pixelOutput.subarray(offset, offset + frameSize));
 
     const imageData = new ImageData(pixelData, width, height);
-    frames.push({ width, height, imageData });
+    if (canvasOffsets) {
+      frames.push({
+        width,
+        height,
+        imageData,
+        offsetX: canvasOffsets[i * 2],
+        offsetY: canvasOffsets[i * 2 + 1],
+      });
+    } else {
+      frames.push({ width, height, imageData });
+    }
   }
 
   const head: MpcHead = {
@@ -148,6 +168,7 @@ function decodeMsfAsMpc(
     interval: Math.round(1000 / Math.max(header.fps, 1)),
     bottom: header.anchor_y,
     left: header.anchor_x,
+    tileAnchored,
   };
 
   return { head, frames, palette: [] };

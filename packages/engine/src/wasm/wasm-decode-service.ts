@@ -164,6 +164,9 @@ function buildMpcFromPayload(payload: MpcPayload): Mpc {
   const frameSizes = new Uint32Array(payload.frameSizesBuffer);
   const frameOffsets = new Uint32Array(payload.frameOffsetsBuffer);
   const allPixels = new Uint8Array(payload.pixelBuffer);
+  const canvasOffsets = payload.canvasOffsetsBuffer
+    ? new Int16Array(payload.canvasOffsetsBuffer)
+    : null;
 
   const frames: MpcFrame[] = [];
   for (let i = 0; i < payload.frameCount; i++) {
@@ -173,7 +176,17 @@ function buildMpcFromPayload(payload: MpcPayload): Mpc {
     const size = w * h * 4;
     const pixelData = new Uint8ClampedArray(size);
     pixelData.set(allPixels.subarray(offset, offset + size));
-    frames.push({ width: w, height: h, imageData: new ImageData(pixelData, w, h) });
+    if (canvasOffsets) {
+      frames.push({
+        width: w,
+        height: h,
+        imageData: new ImageData(pixelData, w, h),
+        offsetX: canvasOffsets[i * 2],
+        offsetY: canvasOffsets[i * 2 + 1],
+      });
+    } else {
+      frames.push({ width: w, height: h, imageData: new ImageData(pixelData, w, h) });
+    }
   }
 
   const head: MpcHead = {
@@ -186,6 +199,7 @@ function buildMpcFromPayload(payload: MpcPayload): Mpc {
     interval: payload.interval,
     bottom: payload.bottom,
     left: payload.left,
+    tileAnchored: payload.tileAnchored,
   };
 
   return { head, frames, palette: [] };

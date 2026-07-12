@@ -470,6 +470,14 @@ export class MsfHeader {
         return ret;
     }
     /**
+     * Header flags: bit 0 = zstd blob, bit 1 = per-frame tile anchors
+     * @returns {number}
+     */
+    get flags() {
+        const ret = wasm.__wbg_get_msfheader_flags(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * @returns {number}
      */
     get fps() {
@@ -541,6 +549,13 @@ export class MsfHeader {
      */
     set directions(arg0) {
         wasm.__wbg_set_msfheader_directions(this.__wbg_ptr, arg0);
+    }
+    /**
+     * Header flags: bit 0 = zstd blob, bit 1 = per-frame tile anchors
+     * @param {number} arg0
+     */
+    set flags(arg0) {
+        wasm.__wbg_set_msfheader_flags(this.__wbg_ptr, arg0);
     }
     /**
      * @param {number} arg0

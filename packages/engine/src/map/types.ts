@@ -19,12 +19,20 @@ export interface MpcHead {
   interval: number;
   bottom: number;
   left: number;
+  /** MSF flags bit1: frames carry per-frame canvas offsets rebased to the
+   *  header anchor (left/bottom); tile draw = pos - anchor + frame offset.
+   *  Absent/false for original MPC and MPC-converted MSF (yueying): frames
+   *  are full-canvas and use the geometric fallback (centered, h-16). */
+  tileAnchored?: boolean;
 }
 
 export interface MpcFrame {
   width: number;
   height: number;
   imageData: ImageData;
+  /** Per-frame canvas offset (only when head.tileAnchored) */
+  offsetX?: number;
+  offsetY?: number;
 }
 
 export interface Mpc {

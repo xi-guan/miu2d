@@ -18,13 +18,18 @@ const _tempPos = { x: 0, y: 0 };
  */
 const _batchBuckets: number[][] = [];
 
-/** 单个 MPC 图集：一张 atlas canvas + 每帧的源矩形 */
+/** 单个 MPC 图集：一张 atlas canvas + 每帧的源矩形
+ *  offX/offY: 帧在原画布内的偏移（仅 anchored 时非零） */
 export interface MpcAtlas {
   canvas: HTMLCanvasElement;
-  rects: { x: number; y: number; w: number; h: number }[];
-  /** 贴图底部锚点（MSF 头 anchor_y）：tile 从锚点向上绘制 bottom 像素。
-   *  挂墙装饰（字画/蓑衣）锚点大、地砖锚点≈height-16，正确的锚点让两者各就其位。 */
+  rects: { x: number; y: number; w: number; h: number; offX: number; offY: number }[];
+  /** MSF 头锚点 (anchor_x/anchor_y) */
   bottom: number;
+  left: number;
+  /** true = IMG 转换的 tile（flags bit1）：紧致帧 + per-frame offset，
+   *  定位 = pos - 锚点 + offset，挂墙装饰（对联/蓑衣/门梁）借此归位。
+   *  false = 原始 MPC / yueying：满幅帧，几何回退（居中、底边贴 py+16）。 */
+  anchored: boolean;
 }
 
 export interface MapRenderer {
@@ -85,11 +90,12 @@ function getOrCreateMpcAtlas(url: string, mpc: Mpc): MpcAtlas {
 /** 将 MPC 所有帧打包到一张 atlas canvas 中，减少纹理切换 */
 function createMpcAtlas(mpc: Mpc): MpcAtlas {
   const frames = mpc.frames;
+  const anchored = mpc.head.tileAnchored === true;
   if (frames.length === 0) {
     const c = document.createElement("canvas");
     c.width = 1;
     c.height = 1;
-    return { canvas: c, rects: [], bottom: mpc.head.bottom };
+    return { canvas: c, rects: [], bottom: mpc.head.bottom, left: mpc.head.left, anchored };
   }
 
   // 使用行式排列：所有帧横向排列
@@ -113,7 +119,7 @@ function createMpcAtlas(mpc: Mpc): MpcAtlas {
   canvas.height = atlasHeight;
   const ctx = canvas.getContext("2d");
 
-  const rects: { x: number; y: number; w: number; h: number }[] = [];
+  const rects: MpcAtlas["rects"] = [];
 
   if (ctx) {
     for (let i = 0; i < frames.length; i++) {
@@ -122,7 +128,14 @@ function createMpcAtlas(mpc: Mpc): MpcAtlas {
       const x = col * maxFrameWidth;
       const y = row * maxFrameHeight;
       ctx.putImageData(frames[i].imageData, x, y);
-      rects.push({ x, y, w: frames[i].width, h: frames[i].height });
+      rects.push({
+        x,
+        y,
+        w: frames[i].width,
+        h: frames[i].height,
+        offX: frames[i].offsetX ?? 0,
+        offY: frames[i].offsetY ?? 0,
+      });
     }
   }
 
@@ -131,7 +144,7 @@ function createMpcAtlas(mpc: Mpc): MpcAtlas {
     (frame as { imageData: ImageData | null }).imageData = null!;
   }
 
-  return { canvas, rects, bottom: mpc.head.bottom };
+  return { canvas, rects, bottom: mpc.head.bottom, left: mpc.head.left, anchored };
 }
 
 /**
@@ -216,8 +229,10 @@ export function renderMapToOffscreen(mapRenderer: MapRenderer): HTMLCanvasElemen
         const rect = atlas.rects[frame];
         const px = (r % 2) * 32 + 64 * c;
         const py = 16 * r;
-        const anchorY = false ? atlas.bottom - 16 : rect.h - 16; // TEMP: 回退验证黑块来源
-        const drawX = Math.floor(px - rect.w / 2 + offX);
+        const anchorY = atlas.anchored ? atlas.bottom - 16 - rect.offY : rect.h - 16;
+        const drawX = Math.floor(
+          px - (atlas.anchored ? atlas.left - rect.offX : rect.w / 2) + offX
+        );
         const drawY = Math.floor(py - anchorY + offY);
 
         ctx.drawImage(
@@ -427,12 +442,12 @@ function drawTileLayer(
 
   const rect = atlas.rects[frame];
   tileToPixel(col, row, _tempPos);
-  const drawX = Math.floor(_tempPos.x - rect.w / 2 - mapRenderer.camera.x);
-  // MSF 锚点 bottom 是「贴图底边到行基线」的距离；绘制基线在行中心（上移 16）。
-  // 地砖 bottom==height → bottom-16 == rect.h-16（行为不变）；
-  // 挂墙/立体 bottom>height → 多上抬，贴图回到墙面。
-  // bottom 缺失（旧数据=0）时回退几何默认 rect.h-16。
-  const anchorY = false ? atlas.bottom - 16 : rect.h - 16; // TEMP: 回退验证黑块来源
+  // anchored (IMG tile): 帧左上 = 基线(py+16 为底) - 头锚点 + 帧内偏移；
+  // legacy (yueying/原始 MPC): 满幅帧, 居中 + 底边贴 py+16。
+  const drawX = Math.floor(
+    _tempPos.x - (atlas.anchored ? atlas.left - rect.offX : rect.w / 2) - mapRenderer.camera.x
+  );
+  const anchorY = atlas.anchored ? atlas.bottom - 16 - rect.offY : rect.h - 16;
   const drawY = Math.floor(_tempPos.y - anchorY - mapRenderer.camera.y);
 
   renderer.drawSourceEx(atlas.canvas, drawX, drawY, {
@@ -535,9 +550,9 @@ export function getTileTextureRegion(
 
   const rect = atlas.rects[frame];
   tileToPixel(col, row, _tempPos);
-  const anchorY = false ? atlas.bottom - 16 : rect.h - 16; // TEMP: 回退验证黑块来源
+  const anchorY = atlas.anchored ? atlas.bottom - 16 - rect.offY : rect.h - 16;
   return {
-    x: _tempPos.x - rect.w / 2,
+    x: _tempPos.x - (atlas.anchored ? atlas.left - rect.offX : rect.w / 2),
     y: _tempPos.y - anchorY,
     width: rect.w,
     height: rect.h,

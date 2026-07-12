@@ -90,6 +90,10 @@ export class MsfHeader {
     canvas_height: number;
     canvas_width: number;
     directions: number;
+    /**
+     * Header flags: bit 0 = zstd blob, bit 1 = per-frame tile anchors
+     */
+    flags: number;
     fps: number;
     frame_count: number;
     frames_per_direction: number;
@@ -320,6 +324,7 @@ export interface InitOutput {
     readonly __wbg_get_msfheader_canvas_height: (a: number) => number;
     readonly __wbg_get_msfheader_canvas_width: (a: number) => number;
     readonly __wbg_get_msfheader_directions: (a: number) => number;
+    readonly __wbg_get_msfheader_flags: (a: number) => number;
     readonly __wbg_get_msfheader_fps: (a: number) => number;
     readonly __wbg_get_msfheader_frame_count: (a: number) => number;
     readonly __wbg_get_msfheader_frames_per_direction: (a: number) => number;
@@ -343,6 +348,7 @@ export interface InitOutput {
     readonly __wbg_set_msfheader_canvas_height: (a: number, b: number) => void;
     readonly __wbg_set_msfheader_canvas_width: (a: number, b: number) => void;
     readonly __wbg_set_msfheader_directions: (a: number, b: number) => void;
+    readonly __wbg_set_msfheader_flags: (a: number, b: number) => void;
     readonly __wbg_set_msfheader_fps: (a: number, b: number) => void;
     readonly __wbg_set_msfheader_frame_count: (a: number, b: number) => void;
     readonly __wbg_set_msfheader_frames_per_direction: (a: number, b: number) => void;
@@ -390,9 +396,6 @@ export interface InitOutput {
     readonly version: () => [number, number];
     readonly zstd_decompress: (a: number, b: number) => [number, number, number, number];
     readonly init: () => void;
-    readonly pathfinder_dynamic_bitmap_ptr: (a: number) => number;
-    readonly pathfinder_hard_obstacle_bitmap_ptr: (a: number) => number;
-    readonly pathfinder_obstacle_bitmap_ptr: (a: number) => number;
     readonly __wbg_set_mpcheader_bottom: (a: number, b: number) => void;
     readonly __wbg_set_mpcheader_color_count: (a: number, b: number) => void;
     readonly __wbg_set_mpcheader_direction: (a: number, b: number) => void;
@@ -403,6 +406,9 @@ export interface InitOutput {
     readonly __wbg_set_mpcheader_interval: (a: number, b: number) => void;
     readonly __wbg_set_mpcheader_left: (a: number, b: number) => void;
     readonly __wbg_set_msfheader_total_individual_pixel_bytes: (a: number, b: number) => void;
+    readonly pathfinder_dynamic_bitmap_ptr: (a: number) => number;
+    readonly pathfinder_hard_obstacle_bitmap_ptr: (a: number) => number;
+    readonly pathfinder_obstacle_bitmap_ptr: (a: number) => number;
     readonly __wbg_get_mpcheader_bottom: (a: number) => number;
     readonly __wbg_get_mpcheader_color_count: (a: number) => number;
     readonly __wbg_get_mpcheader_direction: (a: number) => number;

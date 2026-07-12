@@ -36,6 +36,8 @@ interface WasmMsfHeader {
   palette_size: number;
   frames_per_direction: number;
   total_individual_pixel_bytes: number;
+  /** Header flags: bit 0 = zstd blob, bit 1 = per-frame tile anchors */
+  flags: number;
 }
 
 interface WasmMpcHeader {

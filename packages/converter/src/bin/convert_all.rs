@@ -778,7 +778,11 @@ mod mpc_msf {
         }
         let blob = zstd::encode_all(concat_raw.as_slice(), 3).ok()?;
 
-        let flags: u16 = 1; // bit 0: zstd (blob below is zstd-compressed)
+        // bit 0: zstd (blob below is zstd-compressed)
+        // bit 1: per-frame tile anchors — frames are tight-cropped with canvas offsets
+        //        rebased to the header anchor (left/bottom); map tile rendering must
+        //        apply `pos - anchor + frameOffset` instead of the geometric fallback
+        let flags: u16 = 1 | 2;
         let frame_table_bytes = frame_count * FRAME_ENTRY_SIZE;
         let total = 8 + 16 + 4 + frame_table_bytes + 8 + blob.len();
         let mut out = Vec::with_capacity(total);

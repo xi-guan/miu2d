@@ -147,6 +147,10 @@ export interface MpcPayload {
   frameSizesBuffer: ArrayBuffer;
   /** Uint32Array 视图：[offset0, offset1, …] */
   frameOffsetsBuffer: ArrayBuffer;
+  /** MSF flags bit1：帧带 per-frame 画布偏移（IMG 转换的 tile） */
+  tileAnchored: boolean;
+  /** Int16Array 视图：[ox0, oy0, ox1, oy1, …]（仅 tileAnchored 时存在） */
+  canvasOffsetsBuffer?: ArrayBuffer;
 }
 
 function decodeMpcInWorker(data: Uint8Array): MpcPayload | null {
@@ -164,11 +168,18 @@ function decodeMpcInWorker(data: Uint8Array): MpcPayload | null {
     const frameSizesOutput = new Uint8Array(header.frame_count * 2 * 4);
     const frameOffsetsOutput = new Uint8Array(header.frame_count * 4);
 
+    // flags bit1: tile 带 per-frame 画布偏移，请求 canvas offsets 供锚点定位
+    const tileAnchored = (header.flags & 2) !== 0;
+    const canvasOffsetsOutput = tileAnchored
+      ? new Uint8Array(header.frame_count * 2 * 2)
+      : undefined;
+
     const frameCount = wasm.decode_msf_individual_frames(
       data,
       pixelOutput,
       frameSizesOutput,
-      frameOffsetsOutput
+      frameOffsetsOutput,
+      canvasOffsetsOutput
     );
     if (frameCount === 0) return null;
 
@@ -186,6 +197,8 @@ function decodeMpcInWorker(data: Uint8Array): MpcPayload | null {
       pixelBuffer: pixelOutput.buffer,
       frameSizesBuffer: frameSizesOutput.buffer,
       frameOffsetsBuffer: frameOffsetsOutput.buffer,
+      tileAnchored,
+      canvasOffsetsBuffer: canvasOffsetsOutput?.buffer,
     };
   }
 
@@ -219,6 +232,7 @@ function decodeMpcInWorker(data: Uint8Array): MpcPayload | null {
     pixelBuffer: pixelOutput.buffer,
     frameSizesBuffer: frameSizesOutput.buffer,
     frameOffsetsBuffer: frameOffsetsOutput.buffer,
+    tileAnchored: false,
   };
 }
 
@@ -266,6 +280,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         payload.frameSizesBuffer,
         payload.frameOffsetsBuffer,
       ];
+      if (payload.canvasOffsetsBuffer) transfers.push(payload.canvasOffsetsBuffer);
       (self as unknown as Worker).postMessage(
         { id, ok: true, payload } satisfies WorkerResponse,
         transfers

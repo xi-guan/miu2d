@@ -88,6 +88,8 @@ pub struct MsfHeader {
     pub frames_per_direction: u16,
     /// Total RGBA bytes for all frames when decoded individually
     pub total_individual_pixel_bytes: u32,
+    /// Header flags: bit 0 = zstd blob, bit 1 = per-frame tile anchors
+    pub flags: u16,
 }
 
 // ============================================================================
@@ -117,6 +119,7 @@ pub fn parse_msf_header(data: &[u8]) -> Option<MsfHeader> {
         return None;
     }
 
+    let flags = u16::from_le_bytes([data[6], data[7]]);
     let off = 8;
     let canvas_width = u16::from_le_bytes([data[off], data[off + 1]]);
     let canvas_height = u16::from_le_bytes([data[off + 2], data[off + 3]]);
@@ -169,6 +172,7 @@ pub fn parse_msf_header(data: &[u8]) -> Option<MsfHeader> {
         palette_size,
         frames_per_direction,
         total_individual_pixel_bytes,
+        flags,
     })
 }
 
