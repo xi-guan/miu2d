@@ -11,11 +11,11 @@ import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-type GameTab = "sword1" | "yuying" | "sword2";
+type GameTab = "sword1" | "yueying" | "sword2";
 
 const GAME_TABS: { key: GameTab; slug: string }[] = [
   { key: "sword1", slug: "sword1" },
-  { key: "yuying", slug: "yuying" },
+  { key: "yueying", slug: "yueying" },
   { key: "sword2", slug: "sword2" },
 ];
 

@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 const GAMES = [
-  { slug: "yuying", name: "月影传说", logo: "/screenshot/logo-yuying.webp" },
+  { slug: "yueying", name: "月影传说", logo: "/screenshot/logo-yueying.webp" },
   { slug: "sword1", name: "新剑侠情缘", logo: "/screenshot/logo-new-swords.png" },
   { slug: "sword2", name: "剑侠情缘2", logo: "/screenshot/logo-sword2.png" },
 ] as const;
