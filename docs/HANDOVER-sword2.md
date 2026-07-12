@@ -1,15 +1,15 @@
 # 交接文档 — sword2(剑侠情缘2) 上线进度
 
-日期: 2026-06-19
+日期: 2026-06-19 (更新: 2026-07-12)
 
 ## 一句话现状
-sword2 的**资源已就绪**(`resources/sword2/`)、**game 行已建且 slug 已对齐**，但**库里的游戏数据(npc/magic/goods/scene)还是空的**，所以还不能真正玩。下一步卡在"如何把 ini 数据导入库"——这个源头还没找到。
+sword2 **可玩**: 数据已入库、地图 tile 渲染正常、挂墙物锚点已修(2026-07-12, 见黑屏排查第三层)。遗留: msf 尚未导入 MinIO(有意为之, 读磁盘方便重转)、trap 缺失、零星 404(见文末)。下一个游戏是 sword1(.pak 未解开)。
 
 ## 三个游戏的命名映射(口语序号易混,务必先看这个)
 ```
 原始目录                        真实游戏          resources 目录   状态
-(无原始,已在库)                月影传说          resources/yuying  ✓ 完整可玩
-games-raw/jxqy2-assets        sword2(剑侠情缘2)  resources/sword2  资源好,数据空
+(无原始,已在库)                月影传说          resources/yueying  ✓ 完整可玩
+games-raw/jxqy2-assets        sword2(剑侠情缘2)  resources/sword2  ✓ 可玩(数据已入库,tile已修)
 games-raw/xinjianxiaqingyuan  sword1(新剑侠情缘) (未转)            素材锁在.pak,打不开
 ```
 注意: 目录历史命名错位过,以本表为准。
@@ -17,8 +17,8 @@ games-raw/xinjianxiaqingyuan  sword1(新剑侠情缘) (未转)            素材
 ## 库现状 (postgres: docker miu2d-postgres, 端口5533:5432, 库 miu2d_db, postgres/postgres)
 ```
 slug        name        npc  magic scene   说明
-yuying      月影传说    256   54    68     ← 完整,可玩,是"标准答案"
-sword2      剑侠情缘贰   0    0     0      ← 资源好但数据空壳(本次重点)
+yueying      月影传说    256   54    68     ← 完整,可玩,是"标准答案"
+sword2      剑侠情缘贰   -    -     -      ← 已入库可玩(计数见下文「导入产物」; 表为 06-19 快照)
 admin-game  Admin的游戏  0    0     0      ← seed兜底,保留勿删
 user-game   User的游戏   0    0     0      ← seed兜底,保留勿删
 ```
@@ -92,10 +92,10 @@ initialMap=沙漠之战 已设
 ### 验证现状
 - 数据层全绿: `GET /game/sword2/api/config`(initialMap=沙漠之战) + `/api/data`(各模块计数对) +
   tile 路径 http=200。引擎能读数据、跑脚本、加载主角(满血)、放音乐。
-- 浏览器实测: **新游戏能进(New game started)、主角/UI/音乐正常,但地图地面 tile 大面积黑屏**。
+- 浏览器实测: **新游戏能进(New game started)、主角/UI/音乐正常,但地图地面 tile 大面积黑屏**(06-19 快照; 已修, 见下节)。
   (server :4100 + web :5274 dev;MinIO :9110 资源回退,postgres miu2d-postgres :5533)
 
-## ★★ 黑屏排查 (两层根因均已定位; 第一层已修, 第二层未修)
+## ★★ 黑屏/tile 渲染排查 (三层根因, 已全部修复)
 新游戏进沙漠之战,主角/技能栏/音乐/脚本都正常,**唯独地图地面 tile 渲染不出来(黑)**,只有零星元素。
 换图实测: 沙漠之战 + 临安城 都全黑 → **sword2 所有地图都黑, 不是某张图特有**, 是普遍问题。
 
@@ -109,13 +109,13 @@ initialMap=沙漠之战 已设
   重编译 → 重跑 map2mmf(58 mmf,tile 名已正确 UTF-8) → step_map_tiles(复制 tile 到
   msf/map/<场景>/, 3382个) → 重导 scene 入库。tile 路径 curl 全 200。
 
-### ★ 第二层 root cause (已定位, 未修): 地图 tile msf 像素全透明
+### ★ 第二层 (已修, commit 7c36b36): 地图 tile msf 像素全透明
 **sword2 的地图 tile msf 解码出来 0% 非透明像素(全透明)** → 贴图加载成功、atlas 也建好,
 但画上去是透明的 → 地面什么都看不到 → 黑。这才是修完贴图名乱码后仍黑的真因。
 
 实测(WASM 解码器 `parse_msf_header` + `decode_msf_individual_frames`, Node 跑, 月影做基准):
 ```
-yuying  tile (mpc/map/.../地面01.msf): canvas=64x160 dir=8 frames=30 nonTransp=100% ✓ 正常
+yueying  tile (mpc/map/.../地面01.msf): canvas=64x160 dir=8 frames=30 nonTransp=100% ✓ 正常
 sword2  tile (msf/map/沙漠之战/ground-沙漠.msf): canvas=8x100 dir=0 frames=66 nonTransp=0% ✗ 全透明
 ```
 - 同一 WASM 解码器、同一函数,月影 tile 出满像素,sword2 tile 出 0 像素。头部也异常
@@ -127,14 +127,24 @@ sword2  tile (msf/map/沙漠之战/ground-沙漠.msf): canvas=8x100 dir=0 frames
   但角色实际能渲染 —— 因为角色走 **ASF 解码路径**(`loadAsf`→`decode_asf_frames`),不是 tile 的
   MSF-as-MPC 路径(`loadMpc`→`decodeMsfAsMpc`→`decode_msf_individual_frames`)。别拿角色当反例。
 
-### ★ 第二层下一步 (修复方向)
-1) 定位 mpc2msf.rs 对 `IMG ` 格式 mpc 的解码/透明度处理 bug(为何产出全透明)。可对比月影 mpc
-   (能转对)与 sword2 mpc(`IMG `)的格式差异。Rust 入口: `packages/converter/src/bin/mpc2msf.rs`
-   的 `decode_mpc_rle_to_rgba`(~166行)、`convert_all.rs`。
-2) 修好后需**重转 sword2 全部 2616 个 msf**(不只地图 tile,角色/物件可能也受影响——但角色走 asf
-   解码看似正常,重点是 map tile)→ 重跑 map2mmf → step_map_tiles → 重导 scene。
+第二层已随 commit 7c36b36 (converter fixes, IMG 格式解码) 修复并重转, tile 正常渲染。
+注意: IMG 转换逻辑实际在 `convert_all.rs` 的 `convert_img_to_msf`, **不在 mpc2msf.rs**(它没有 IMG 路径)。
 - 注: sword2 的 tile 实际在 `mpc/map/<tile包名>/`(如 mpc/map/狂沙镇/),场景名≠tile包名
   (沙漠之战↔狂沙镇,从 .map offset 0x20 读)。step_map_tiles 已据此复制到 msf/map/<场景名>/。
+
+### ★ 第三层 (已修 2026-07-12, commit 51a71ab): 挂墙物锚点丢失, 对联/蓑衣/门梁落地
+tile 渲染出来后发现挂墙装饰(对联/贴字/蓑衣/门梁)全部画在地面(最大低 94px)。
+- **根因**: sword2 IMG 格式的帧是"紧致小图 + per-frame offset"(定位在元数据里), 月影 MPC 是
+  "满幅帧 + 透明 padding"(定位烘在像素里)。引擎 map tile 解码时丢弃了 per-frame offset,
+  绘制统一用月影语义(底边贴 tile 基线) → 满幅地砖恰好正确, 挂墙小图全部落地。
+- **修复**: MSF header flags bit1 = "tile 带 per-frame 锚点"(仅 IMG 转换路径写入);
+  引擎按 flag 分流: anchored → `pos - 锚点 + offset`, 否则原公式。月影文件无 bit1, 零影响。
+  1025 个 tile 源重转(仅 flags 字节变)+ 3382 个分发副本按内容匹配同步。
+- **★ 排坑(必读)**: 解码逻辑在 `wasm-decode-worker.ts` 里有一份**独立重复实现**, 运行时走
+  worker 路径, `wasm-mpc-decoder.ts` 只是回退。第一轮只改了回退路径 → 运行时零变化。
+  改解码器须同步 4 处: wasm-*-decoder.ts / wasm-decode-worker.ts(解码+payload+transfers) /
+  wasm-decode-service.ts(payload→对象)。
+- sword1 若素材同为 IMG 系格式, 转换时自动带 bit1, 直接受益。
 
 ### 遗留小问题(非黑屏关键)
 - 404: `asf/ui/littlehead/主角.msf`/`南宫飞云.msf`(对话头像小图)。
