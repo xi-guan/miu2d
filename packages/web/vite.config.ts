@@ -7,6 +7,7 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const envDir = path.resolve(__dirname, "../..");
 
 function getGitCommit(): string {
   // Docker build injects COMMIT_HASH env var; fall back to git for local dev
@@ -66,7 +67,7 @@ function resources404Plugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
+  const env = loadEnv(mode, envDir, "");
   // 代理目标：本地默认各自端口，设置环境变量后可代理到远端
   // 用法：在 .env.local 中设置 BACKEND_URL=https://xxx 和 S3_URL=https://xxx
   const backendUrl = env.BACKEND_URL ?? "http://localhost:4100";
@@ -75,6 +76,7 @@ export default defineConfig(({ mode }) => {
   const s3StripPrefix = !env.S3_URL;
 
   return {
+  envDir,
   define: {
     __COMMIT_HASH__: JSON.stringify(getGitCommit()),
     __APP_VERSION__: JSON.stringify(getAppVersion()),
