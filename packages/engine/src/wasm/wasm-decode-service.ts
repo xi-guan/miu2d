@@ -9,10 +9,11 @@
  */
 
 import { logger } from "../core/logger";
-import type { Mpc, MpcFrame, MpcHead } from "../map/types";
-import type { AsfData, AsfFrame } from "../resource/format/asf";
+import type { Mpc } from "../map/types";
+import type { AsfData } from "../resource/format/asf";
 import { decodeAsfWasm } from "./wasm-asf-decoder";
-import type { AsfPayload, MpcPayload, WorkerRequest, WorkerResponse } from "./wasm-decode-worker";
+import { buildAsfFromPayload, buildMpcFromPayload } from "./wasm-decode-core";
+import type { WorkerRequest, WorkerResponse } from "./wasm-decode-worker";
 import { decodeMpcWasm } from "./wasm-mpc-decoder";
 
 /** Worker 池大小：取 CPU 核心数的一半（最少 1，最多 2）
@@ -94,115 +95,6 @@ function sendToWorker(
     const msg: WorkerRequest = { id, type, buffer: buffer.slice(0) };
     entry.worker.postMessage(msg, [msg.buffer]);
   });
-}
-
-// ===================== 从 Worker 结果重建 ImageData =====================
-
-function buildAsfFromPayload(payload: AsfPayload): AsfData {
-  const { width, height, frameCount } = payload;
-  const allPixels = new Uint8Array(payload.pixelBuffer);
-  const frames: AsfFrame[] = [];
-
-  if (payload.frameSizesBuffer && payload.frameOffsetsBuffer) {
-    // Tight-bbox per-frame decoding (MSF path)
-    const frameSizes = new Uint32Array(payload.frameSizesBuffer);
-    const frameOffsets = new Uint32Array(payload.frameOffsetsBuffer);
-    const canvasOffsets = payload.canvasOffsetsBuffer
-      ? new Int16Array(payload.canvasOffsetsBuffer)
-      : null;
-
-    for (let i = 0; i < frameCount; i++) {
-      const w = frameSizes[i * 2];
-      const h = frameSizes[i * 2 + 1];
-      const offset = frameOffsets[i];
-      const size = w * h * 4;
-      const slice = new Uint8ClampedArray(size);
-      slice.set(allPixels.subarray(offset, offset + size));
-      frames.push({
-        width: w,
-        height: h,
-        imageData: new ImageData(slice, w, h),
-        canvas: null,
-        canvasOffsetX: canvasOffsets ? canvasOffsets[i * 2] : 0,
-        canvasOffsetY: canvasOffsets ? canvasOffsets[i * 2 + 1] : 0,
-      });
-    }
-  } else {
-    // Legacy uniform-sized decoding (old ASF path)
-    const frameSize = width * height * 4;
-    for (let i = 0; i < frameCount; i++) {
-      const offset = i * frameSize;
-      const slice = new Uint8ClampedArray(allPixels.buffer, offset, frameSize);
-      frames.push({
-        width,
-        height,
-        imageData: new ImageData(slice, width, height),
-        canvas: null,
-        canvasOffsetX: 0,
-        canvasOffsetY: 0,
-      });
-    }
-  }
-
-  return {
-    width: payload.width,
-    height: payload.height,
-    frameCount: payload.frameCount,
-    directions: payload.directions,
-    colorCount: payload.colorCount,
-    interval: payload.interval,
-    left: payload.left,
-    bottom: payload.bottom,
-    framesPerDirection: payload.framesPerDirection,
-    frames,
-    isLoaded: true,
-    pixelFormat: payload.pixelFormat,
-  };
-}
-
-function buildMpcFromPayload(payload: MpcPayload): Mpc {
-  const frameSizes = new Uint32Array(payload.frameSizesBuffer);
-  const frameOffsets = new Uint32Array(payload.frameOffsetsBuffer);
-  const allPixels = new Uint8Array(payload.pixelBuffer);
-  const canvasOffsets = payload.canvasOffsetsBuffer
-    ? new Int16Array(payload.canvasOffsetsBuffer)
-    : null;
-
-  const frames: MpcFrame[] = [];
-  for (let i = 0; i < payload.frameCount; i++) {
-    const w = frameSizes[i * 2];
-    const h = frameSizes[i * 2 + 1];
-    const offset = frameOffsets[i];
-    const size = w * h * 4;
-    const pixelData = new Uint8ClampedArray(size);
-    pixelData.set(allPixels.subarray(offset, offset + size));
-    if (canvasOffsets) {
-      frames.push({
-        width: w,
-        height: h,
-        imageData: new ImageData(pixelData, w, h),
-        offsetX: canvasOffsets[i * 2],
-        offsetY: canvasOffsets[i * 2 + 1],
-      });
-    } else {
-      frames.push({ width: w, height: h, imageData: new ImageData(pixelData, w, h) });
-    }
-  }
-
-  const head: MpcHead = {
-    framesDataLengthSum: payload.framesDataLengthSum,
-    globalWidth: payload.globalWidth,
-    globalHeight: payload.globalHeight,
-    frameCounts: payload.frameCount,
-    direction: payload.direction,
-    colourCounts: payload.colorCount,
-    interval: payload.interval,
-    bottom: payload.bottom,
-    left: payload.left,
-    tileAnchored: payload.tileAnchored,
-  };
-
-  return { head, frames, palette: [] };
 }
 
 // ===================== 公开 API =====================
