@@ -90,10 +90,16 @@ describe("TimerManager", () => {
       expect(runner).toHaveBeenCalledTimes(1);
     });
 
-    it("ignores when timer not running", () => {
+    it("queues script before timer starts (SetTimeScript -> OpenTimeLimit)", () => {
+      // 原版 C# 会忽略未启动时的调用, 但 map116 Trap01.txt 依赖先排队后开启,
+      // 实现刻意放宽 (见 timer-manager.ts setTimeScript 注释)
       timer.setTimeScript(5, "script.txt");
+      expect(timer.getState().timeScripts).toHaveLength(1);
+
+      timer.openTimeLimit(10);
       const state = timer.getState();
-      expect(state.timeScripts).toHaveLength(0);
+      expect(state.timeScripts).toHaveLength(1);
+      expect(state.timeScripts[0].scriptFileName).toBe("script.txt");
     });
 
     it("overwrites previous time script", () => {

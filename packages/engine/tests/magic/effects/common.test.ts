@@ -24,6 +24,7 @@ function mockPlayerRef(stats: {
       manaMax: stats.manaMax,
       thew: stats.thew,
       thewMax: stats.thewMax,
+      isInGodMode: () => false,
     },
   } as CharacterRef;
 }
@@ -34,6 +35,7 @@ function mockNpcRef(stats: { life: number; lifeMax: number }): CharacterRef {
     npc: {
       life: stats.life,
       lifeMax: stats.lifeMax,
+      isInGodMode: () => false,
     },
     id: "test-npc",
   } as CharacterRef;
@@ -101,6 +103,21 @@ describe("restoreThew", () => {
 });
 
 describe("deductCost", () => {
+  it("skips all costs in god mode", () => {
+    const ref = mockPlayerRef({ life: 100, lifeMax: 100, mana: 50, manaMax: 100, thew: 50, thewMax: 100 });
+    (ref as { player: { isInGodMode: () => boolean } }).player.isInGodMode = () => true;
+    const ctx = {
+      caster: ref,
+      magic: { manaCost: 30, thewCost: 20, lifeCost: 10 },
+      guiManager: {},
+    } as unknown as CastContext;
+
+    deductCost(ctx);
+    expect(ref.player.mana).toBe(50);
+    expect(ref.player.thew).toBe(50);
+    expect(ref.player.life).toBe(100);
+  });
+
   it("deducts mana cost", () => {
     const ref = mockPlayerRef({ life: 100, lifeMax: 100, mana: 50, manaMax: 100, thew: 100, thewMax: 100 });
     const ctx = {
