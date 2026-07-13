@@ -1,0 +1,170 @@
+{
+  "yueying-mpc-tile": {
+    "header": {
+      "canvasWidth": 64,
+      "canvasHeight": 160,
+      "frameCount": 60,
+      "directions": 8,
+      "fps": 10,
+      "anchorX": 32,
+      "anchorY": 80,
+      "pixelFormat": 0,
+      "paletteSize": 0,
+      "framesPerDirection": 7,
+      "flags": 1
+    },
+    "decodedFrames": 60,
+    "sha256": {
+      "pixels": "b2115ac2fd9576325866bc3f4b5a39302ef7223722caf7fcb7f767e273ccf646",
+      "frameSizes": "a106aba0254b1d401efe845936e6a56790670a639b9c920e97c968bd9b70fcbf",
+      "frameOffsets": "d204085408d82454cfaac15f5516fe73da0830acdce43eb95b40a6d77b544bc8",
+      "canvasOffsets": "2dfba633817046c7f559ed4b93076048435f7e1a90f14eb8035c04b9ebae2537"
+    }
+  },
+  "yueying-asf-character": {
+    "header": {
+      "canvasWidth": 61,
+      "canvasHeight": 63,
+      "frameCount": 96,
+      "directions": 8,
+      "fps": 16,
+      "anchorX": 22,
+      "anchorY": 59,
+      "pixelFormat": 2,
+      "paletteSize": 256,
+      "framesPerDirection": 12,
+      "flags": 1
+    },
+    "decodedFrames": 96,
+    "sha256": {
+      "pixels": "4a728ed26207ad67d07546836335a50c891b1027677398bdb3d38ee340f7077b",
+      "frameSizes": "d7b63bd49db09b03717c0b305babca66fcd13311220aec0d3cc113af2143774e",
+      "frameOffsets": "3748c9844c06d9ff51a0b1c6ed7e6ecbe3c5cd241784f59433cfac66a101745d",
+      "canvasOffsets": "ff56b0018b01ab1dc7400b0c4da0a89e0812d11f9590710f8b028b5aadb6d282"
+    }
+  },
+  "sword2-img-tile": {
+    "header": {
+      "canvasWidth": 64,
+      "canvasHeight": 192,
+      "frameCount": 28,
+      "directions": 8,
+      "fps": 10,
+      "anchorX": 32,
+      "anchorY": 192,
+      "pixelFormat": 0,
+      "paletteSize": 0,
+      "framesPerDirection": 3,
+      "flags": 3
+    },
+    "decodedFrames": 28,
+    "sha256": {
+      "pixels": "297645284bd01630253f50b4b8e87817f7dd933e9e80473085a9a1ff7ba068d9",
+      "frameSizes": "5af7b04a96fd6f7e622c6248c161d3a3feeaa7feea1b68708e1b7e32d0714e46",
+      "frameOffsets": "744d5011594dd88777f3c924a30f60d35a8937df2e40420d0042c7172117e6e2",
+      "canvasOffsets": "6007c1eeb640f93dc27303a09859348250ba3161d9109fb1cbfbb018cacde8ef"
+    }
+  },
+  "sword2-img-character": {
+    "header": {
+      "canvasWidth": 130,
+      "canvasHeight": 90,
+      "frameCount": 128,
+      "directions": 8,
+      "fps": 20,
+      "anchorX": 67,
+      "anchorY": 82,
+      "pixelFormat": 0,
+      "paletteSize": 0,
+      "framesPerDirection": 16,
+      "flags": 1
+    },
+    "decodedFrames": 128,
+    "sha256": {
+      "pixels": "0b8e7d40ccedfdecc0edd28fdb91177d37befb55d22f00a284bc338b6048907b",
+      "frameSizes": "f809346bbcea9742e21e39f5967ac72f08a8cb0838ea1caebb3430439090e16d",
+      "frameOffsets": "79e49a5f0974fe174a9749a87b1418ebc80dba3b1b3f7a4f9954e495fd90598f",
+      "canvasOffsets": "84b5342188cc052ca67dfc842c6534a98ff1312aa9f30864ba2783698424066c"
+    }
+  },
+  "sword1-mpc-tile": {
+    "header": {
+      "canvasWidth": 64,
+      "canvasHeight": 160,
+      "frameCount": 30,
+      "directions": 1,
+      "fps": 10,
+      "anchorX": 32,
+      "anchorY": 144,
+      "pixelFormat": 0,
+      "paletteSize": 0,
+      "framesPerDirection": 30,
+      "flags": 1
+    },
+    "decodedFrames": 30,
+    "sha256": {
+      "pixels": "e77a3c8cc46c9985ee6e51dd49cb1f92fe1acb25d4623b1e1d0e84e52c0620a6",
+      "frameSizes": "c67abb0f6357b3e30a065601287c5247fa0886b9064b4d68123a6e73ae041c7c",
+      "frameOffsets": "dc055b809e101ee35a4bab704ea9c3fe40e3eae3dfd01d6f7d43065654050ad7",
+      "canvasOffsets": "6edd9f6f9cc92cded36e6c4a580933f9c9f1b90562b46903b806f21902a1a54f"
+    }
+  },
+  "sword1-asf-character": {
+    "header": {
+      "canvasWidth": 65,
+      "canvasHeight": 70,
+      "frameCount": 21,
+      "directions": 1,
+      "fps": 12,
+      "anchorX": 40,
+      "anchorY": 50,
+      "pixelFormat": 2,
+      "paletteSize": 256,
+      "framesPerDirection": 21,
+      "flags": 1
+    },
+    "decodedFrames": 21,
+    "sha256": {
+      "pixels": "a90dde9ff2b33011b3f5942964cfa4d46570de216cc563ae36f31dd032155531",
+      "frameSizes": "deb0da557638fb3b98dde326a19bcd22f564ee89e1a1160dc20ed846a0208e64",
+      "frameOffsets": "a9edbc2dd5e4d71f0da683305fb5e9549e7b1b8f02a9ae99ac51651f0afa7f13",
+      "canvasOffsets": "25a33f0d9b56fd2e04973128e9a8cba482e98073145c9d3efe600872f3a51ad4"
+    }
+  },
+  "yueying-original-mpc": {
+    "header": {
+      "globalWidth": 64,
+      "globalHeight": 96,
+      "frameCount": 60,
+      "direction": 8,
+      "colorCount": 256,
+      "interval": 100,
+      "left": 32,
+      "bottom": 80,
+      "framesDataLengthSum": 625200
+    },
+    "decodedFrames": 60,
+    "sha256": {
+      "pixels": "b2115ac2fd9576325866bc3f4b5a39302ef7223722caf7fcb7f767e273ccf646",
+      "frameSizes": "a106aba0254b1d401efe845936e6a56790670a639b9c920e97c968bd9b70fcbf",
+      "frameOffsets": "d204085408d82454cfaac15f5516fe73da0830acdce43eb95b40a6d77b544bc8"
+    }
+  },
+  "yueying-original-asf": {
+    "header": {
+      "width": 61,
+      "height": 63,
+      "frameCount": 96,
+      "directions": 8,
+      "colorCount": 256,
+      "interval": 60,
+      "left": 22,
+      "bottom": 59,
+      "framesPerDirection": 12
+    },
+    "decodedFrames": 96,
+    "sha256": {
+      "pixels": "9de870e00fbec309fc284a0421d5f19bb4b71296f76138228cdc58b74628a0ba"
+    }
+  }
+}

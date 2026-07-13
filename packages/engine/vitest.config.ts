@@ -1,4 +1,8 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
@@ -8,7 +12,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@miu2d/engine": "/home/william/me/miu2d/packages/engine/src",
+      "@miu2d/engine": path.resolve(dirname, "src"),
     },
   },
 });
