@@ -22,7 +22,7 @@ import {
   HiOutlineSparkles,
   HiOutlineUserGroup,
 } from "react-icons/hi2";
-import { GameUIContext } from "../contexts";
+import { GameUIContext, type PanelType } from "../contexts";
 import { EngineWatermark } from "./common/EngineWatermark";
 import type { BottomMagicDragData, GameUILogic, MagicDragData } from "./hooks";
 import { useBuildGameUIContextValue, useTouchDropHandlers } from "./hooks";
