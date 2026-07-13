@@ -1,5 +1,7 @@
 # MSF (Miu Sprite Format) v1 — 二进制格式规范
 
+> ⚠ **已废弃**：v1 已被 v2 取代（magic `"MSF2"`），现行规范见 [msf-format.md](msf-format.md)。本文仅作历史参考。
+
 MSF 是 Miu2D Engine 设计的精灵动画格式，替代旧的 ASF 和 MPC 格式用于 Web 平台。
 
 > **设计目标**：快解码、可扩展、Web 原生、无损保留 ASF/MPC 的全部视觉信息

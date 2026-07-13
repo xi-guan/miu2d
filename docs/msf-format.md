@@ -69,7 +69,7 @@ MSF 是 Miu2D Engine 设计的精灵动画格式，替代旧的 ASF 和 MPC 格�
 |------|------|------|------|------|
 | 0x00 | 4 | char[4] | `magic` | 固定 `"MSF2"` (0x4D 0x53 0x46 0x32) |
 | 0x04 | 2 | u16 | `version` | 格式版本 = `2` |
-| 0x06 | 2 | u16 | `flags` | 位标志。bit 0: zstd 压缩 (v2 始终为 1) |
+| 0x06 | 2 | u16 | `flags` | 位标志。bit 0: zstd 压缩 (v2 始终为 1)。bit 1: per-frame tile 锚点（见 Frame Table 节） |
 
 ### Header (偏移 0x08, 16 字节)
 
@@ -119,6 +119,17 @@ MSF 是 Miu2D Engine 设计的精灵动画格式，替代旧的 ASF 和 MPC 格�
 | +6 | 2 | u16 | `height` | tight bbox 高度（0 = 空帧） |
 | +8 | 4 | u32 | `dataOffset` | 在解压后 blob 中的偏移 |
 | +12 | 4 | u32 | `dataLength` | 帧数据字节数 = `width × height × bpp` |
+
+**flags bit 1 — per-frame tile 锚点**（2026-07-12 引入，仅 IMG → MSF 转换路径写入）：
+
+tile 类 MSF 存在两套定位语义，无法从文件内容区分，必须靠此 flag：
+
+| flags bit 1 | 来源 | 帧存储 | 引擎画法 |
+|------|------|------|------|
+| 0 | MPC → MSF（yueying / sword1） | 满幅帧 + 透明 padding | 居中 + 底边贴 `py + 16` |
+| 1 | IMG → MSF（sword2） | tight bbox + per-frame offset | `pos − header 锚点(anchorX/Y) + offsetX/Y` |
+
+渲染实现在 `packages/engine/src/map/map-renderer.ts`（drawTileLayer / renderMapToOffscreen / getTileTextureRegion），回归测试 `packages/engine/tests/map/tile-anchor.test.ts`。
 
 ### Extension Chunks & End Sentinel
 
@@ -221,6 +232,7 @@ ASF 使用 Indexed8Alpha8 (2bpp) 因为需要保留 per-pixel 变化 alpha 值�
 | Rust WASM 解码 | `packages/engine-wasm/src/msf_codec.rs` | WASM 解码器 |
 | Rust CLI (ASF) | `packages/converter/src/main.rs` | ASF → MSF v2 批量转换 |
 | Rust CLI (MPC) | `packages/converter/src/bin/mpc2msf.rs` | MPC → MSF v2 批量转换 |
+| Rust CLI (IMG) | `packages/converter/src/bin/convert_all.rs` | IMG → MSF v2（sword2），写入 flags bit 1 |
 | Rust 验证 (ASF) | `packages/converter/src/bin/verify.rs` | ASF ↔ MSF v2 逐像素验证 |
 | Rust 验证 (MPC) | `packages/converter/src/bin/verify_mpc.rs` | MPC ↔ MSF v2 逐像素验证 |
 | TS ASF 解码 | `packages/engine/src/wasm/wasm-asf-decoder.ts` | MSF v2 / ASF → AsfData |
