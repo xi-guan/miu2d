@@ -152,11 +152,16 @@ tile 渲染出来后发现挂墙装饰(对联/贴字/蓑衣/门梁)全部画在�
 - map2mmf 的 `--traps` 参数没生效(仍找 save/game/Traps.ini,sword2 traps 在 save/rpg0/)→ 陷阱缺。
 - step_map_tiles 检查时提到大写 `Content/`(引擎要小写 content/) — 需确认未破坏之前的小写修复。
 
-## 遗留项2: sword1(新剑侠情缘)
-- 素材锁在 8 个 .pak 里 (`games-raw/xinjianxiaqingyuan/data/*.pak`: asf.pak 312M 等)
-- `scripts/sword2/unpack-pak.py` 解不了它: sword1 的 pak 格式与脚本假设不同
-  (dump 显示无独立名表, offset 直指数据, 数据块前有4字节长度头)
-- 用户决定: 找"不解pak的方法"(如GitHub现成已解包素材仓,类比sword2来自Upwinded/jxqy2-assets) — 未开始
+## 遗留项2: sword1(新剑侠情缘) — 已完成 (2026-07-13)
+sword1 **已可玩**。.pak 解开了,不必找"现成解包仓"。详见 `scripts/sword1/README.md`。
+- 格式是 PACKAGE + **LZO1X 分块**(非本文档旧猜测的"4字节长度头"),index 只存文件名 hash、无名表。
+  参照 GitHub `Upwinded/JXQY-all-in-one` 的 `src/File/PakFile.cpp`。
+- 工具: `packages/converter` 的 `unpack-pak`(解包) 与 `brute-hash`(反推未知路径形状);
+  名单在 `scripts/sword1/names-*.txt`。`scripts/sword2/unpack-pak.py` 对 sword1 无效, 勿复用。
+- **出品年代与直觉相反**: sword2(2000) → yueying(2001) → sword1(2002)。sword1 与 yueying 同代,
+  故 `convert-all` 原样吃下(ASF/MPC→MSF 2644 + MAP→MMF 111, 零失败), 引擎一行未改。
+  sword2 的老引擎变通(talk section 转数字、IMG directions=0)在 sword1 均不适用。
+- sword1 **有 trap**(pristine 表在 `ini/save/traps.ini`, 需拷成 `save/game/Traps.ini`), 补上了 sword2 的缺口。
 
 ## 注意事项
 - postgres 容器本会话期间已 `docker start`,在运行
