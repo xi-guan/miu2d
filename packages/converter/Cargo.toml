@@ -28,9 +28,18 @@ path = "src/bin/verify.rs"
 name = "verify_mpc"
 path = "src/bin/verify_mpc.rs"
 
+[[bin]]
+name = "unpack-pak"
+path = "src/bin/unpack_pak.rs"
+
+[[bin]]
+name = "brute-hash"
+path = "src/bin/brute_hash.rs"
+
 [dependencies]
 walkdir = "2"
 rayon = "1.10"
 zstd = "0.13"
 encoding_rs = "0.8"
 image = "0.25"
+lzo = "0.1.1"
