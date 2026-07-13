@@ -1,8 +1,8 @@
 # 构建阶段
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 # 启用 corepack 以使用 pnpm
-RUN corepack enable && corepack prepare pnpm@10.15.1 --activate
+RUN corepack enable && corepack prepare pnpm@10.16.1 --activate
 
 WORKDIR /app
 

@@ -16,9 +16,9 @@ import type {
   UpdateShopInput,
 } from "@miu2d/types";
 import { createDefaultShop } from "@miu2d/types";
-import type { Prisma, Shop as PrismaShop } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { Prisma, Shop as PrismaShop } from "../../db/generated/prisma/client";
 import type { Language } from "../../i18n";
 import { getMessage } from "../../i18n";
 import { requireGameIdBySlug } from "../../utils/game";

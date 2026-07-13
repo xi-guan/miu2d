@@ -6,9 +6,9 @@
  */
 
 import type { FileNode } from "@miu2d/types";
-import type { File as PrismaFile } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { File as PrismaFile } from "../../db/generated/prisma/client";
 import { getMessage, type Language } from "../../i18n";
 import * as s3 from "../../storage/s3";
 import { verifyGameAccess } from "../../utils/gameAccess";

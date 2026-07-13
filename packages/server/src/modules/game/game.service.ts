@@ -1,6 +1,6 @@
-import type { Game } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { Game } from "../../db/generated/prisma/client";
 import { getMessage, type Language } from "../../i18n";
 
 export const toGameOutput = (dbGame: Game) => ({

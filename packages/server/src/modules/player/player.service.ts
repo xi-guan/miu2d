@@ -19,9 +19,9 @@ import type {
   UpdatePlayerInput,
 } from "@miu2d/types";
 import { createDefaultPlayer } from "@miu2d/types";
-import type { Prisma, Player as PrismaPlayer } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { Prisma, Player as PrismaPlayer } from "../../db/generated/prisma/client";
 import type { Language } from "../../i18n";
 import { getMessage } from "../../i18n";
 import { requireGameIdBySlug } from "../../utils/game";

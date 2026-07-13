@@ -21,9 +21,9 @@ import {
   parseObjEntries,
 } from "@miu2d/types";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 import { downloadFile } from "../storage/s3.js";
+import { PrismaClient } from "./generated/prisma/client";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "../../../../.env") });

@@ -2,7 +2,6 @@ services:
   # PostgreSQL 数据库
   db:
     image: postgres:17-alpine
-    platform: linux/arm64
     container_name: miu2d-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -23,7 +22,6 @@ services:
   # RustFS 文件存储 (S3 兼容, 替代已归档的 MinIO)
   rustfs:
     image: rustfs/rustfs:1.0.0-beta.8
-    platform: linux/arm64
     container_name: miu2d-rustfs
     environment:
       RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
@@ -45,7 +43,6 @@ services:
   # 后端服务 (生产环境用)
   server:
     image: miu2d-server:latest
-    platform: linux/arm64
     container_name: miu2d-server
     build:
       context: .
@@ -74,7 +71,6 @@ services:
   # 前端服务 (生产环境用)
   web:
     image: miu2d-web:latest
-    platform: linux/arm64
     container_name: miu2d-web
     build:
       context: .

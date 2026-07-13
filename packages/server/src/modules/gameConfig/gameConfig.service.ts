@@ -4,8 +4,8 @@ import {
   createDefaultMagicExpConfig,
   GameConfigDataSchema,
 } from "@miu2d/types";
-import type { Prisma, GameConfig as PrismaGameConfig } from "@prisma/client";
 import { db } from "../../db/client";
+import type { Prisma, GameConfig as PrismaGameConfig } from "../../db/generated/prisma/client";
 import type { Language } from "../../i18n";
 import { verifyGameAccess } from "../../utils/gameAccess";
 

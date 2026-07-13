@@ -7,9 +7,9 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import * as path from "node:path";
-import type { Prisma, Save as PrismaSave } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { Prisma, Save as PrismaSave } from "../../db/generated/prisma/client";
 import { env } from "../../env";
 import { deleteFile, getDownloadUrl, uploadFile } from "../../storage/s3";
 import { verifyGameOwnerAccess } from "../../utils/gameAccess";

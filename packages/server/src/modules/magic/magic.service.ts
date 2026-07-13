@@ -24,9 +24,9 @@ import {
   MagicMoveKindFromValue,
   MagicSpecialKindFromValue,
 } from "@miu2d/types";
-import type { Prisma, Magic as PrismaMagic } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { Prisma, Magic as PrismaMagic } from "../../db/generated/prisma/client";
 import type { Language } from "../../i18n";
 import { getMessage } from "../../i18n";
 import { requireGameIdBySlug } from "../../utils/game";

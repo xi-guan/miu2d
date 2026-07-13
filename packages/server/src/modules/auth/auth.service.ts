@@ -1,6 +1,6 @@
 import type { UserSettings } from "@miu2d/types";
-import type { User } from "@prisma/client";
 import { db } from "../../db/client";
+import type { User } from "../../db/generated/prisma/client";
 import { env } from "../../env";
 import { hashPassword } from "../../utils/password";
 

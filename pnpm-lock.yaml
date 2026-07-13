@@ -205,9 +205,6 @@ importers:
       pg:
         specifier: ^8.14.0
         version: 8.20.0
-      prisma:
-        specifier: ^7.4.2
-        version: 7.4.2(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       react:
         specifier: ^19.2.4
         version: 19.2.4
@@ -251,6 +248,9 @@ importers:
       chokidar:
         specifier: ^5.0.0
         version: 5.0.0
+      prisma:
+        specifier: ^7.4.2
+        version: 7.4.2(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       rolldown:
         specifier: ^1.0.0-rc.9
         version: 1.0.0-rc.9

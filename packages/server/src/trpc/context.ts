@@ -1,6 +1,6 @@
-import type { Game } from "@prisma/client";
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { db } from "../db/client";
+import type { Game } from "../db/generated/prisma/client";
 import { normalizeLanguage } from "../i18n";
 import { getCookieValue, resolveUserId, SESSION_COOKIE_NAME } from "../utils/session";
 

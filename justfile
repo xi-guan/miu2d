@@ -27,7 +27,7 @@ _db-up:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ starting db and rustfs"
-    docker compose up -d db rustfs
+    env -u DOCKER_DEFAULT_PLATFORM docker compose up -d db rustfs
     echo "✓ containers up (postgres :5533, rustfs api :9110 console :9101)"
 
 [private]

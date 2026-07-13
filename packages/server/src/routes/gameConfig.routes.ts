@@ -10,11 +10,11 @@
  */
 
 import { createDefaultGameConfig, GameConfigDataSchema } from "@miu2d/types";
-import type { Prisma } from "@prisma/client";
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import sharp from "sharp";
 import { db } from "../db/client";
+import type { Prisma } from "../db/generated/prisma/client";
 import { gameConfigService } from "../modules/gameConfig/gameConfig.service";
 import * as s3 from "../storage/s3";
 import { Logger } from "../utils/logger";

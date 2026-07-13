@@ -1,8 +1,8 @@
 import type { UserSettings } from "@miu2d/types";
-import type { User } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { User } from "../../db/generated/prisma/client";
+import { Prisma } from "../../db/generated/prisma/client";
 import { getMessage, type Language } from "../../i18n";
 import { hashPassword, verifyPassword } from "../../utils/password";
 

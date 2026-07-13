@@ -22,10 +22,10 @@ import type {
   UpdateSceneInput,
 } from "@miu2d/types";
 import { getSceneDataCounts } from "@miu2d/types";
-import type { Scene as PrismaScene } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { Scene as PrismaScene } from "../../db/generated/prisma/client";
+import { Prisma } from "../../db/generated/prisma/client";
 import type { Language } from "../../i18n";
 import { getMessage } from "../../i18n";
 import { batchCheckPaths } from "../../utils/file";

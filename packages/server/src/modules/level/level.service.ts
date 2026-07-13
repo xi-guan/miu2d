@@ -14,9 +14,9 @@ import type {
   UpdateLevelConfigInput,
 } from "@miu2d/types";
 import { createDefaultLevelConfigLevels } from "@miu2d/types";
-import type { Prisma, LevelConfig as PrismaLevelConfig } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { Prisma, LevelConfig as PrismaLevelConfig } from "../../db/generated/prisma/client";
 import type { Language } from "../../i18n";
 import { requireGameIdBySlug } from "../../utils/game";
 import { verifyGameAccess } from "../../utils/gameAccess";

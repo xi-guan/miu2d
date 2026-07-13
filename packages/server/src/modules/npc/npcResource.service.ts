@@ -13,9 +13,9 @@ import type {
   UpdateNpcResInput,
 } from "@miu2d/types";
 import { createDefaultNpcResource } from "@miu2d/types";
-import type { Prisma, NpcResource as PrismaNpcResource } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import type { Prisma, NpcResource as PrismaNpcResource } from "../../db/generated/prisma/client";
 import type { Language } from "../../i18n";
 import { getMessage } from "../../i18n";
 import { requireGameIdBySlug } from "../../utils/game";

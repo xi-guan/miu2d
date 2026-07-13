@@ -1,8 +1,9 @@
 /**
  * 文件路径解析工具（服务端共用）
  */
-import type { File } from "@prisma/client";
+
 import { db } from "../db/client";
+import type { File } from "../db/generated/prisma/client";
 
 /**
  * 根据路径段解析文件（大小写不敏感）
