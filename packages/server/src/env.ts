@@ -51,6 +51,8 @@ export const env = {
   s3Bucket: str("MINIO_BUCKET", "miu2d"),
   /** 客户端可访问的 S3 endpoint（开发走代理，生产走 CDN） */
   s3PublicEndpoint: str("S3_PUBLIC_ENDPOINT", "/s3"),
+  /** S3 不可用时存档截图的磁盘回退目录（相对 cwd，即 packages/server） */
+  saveScreenshotDir: str("SAVE_SCREENSHOT_DIR", "../../.data/save-screenshots"),
 
   // ---------- Email / SMTP ----------
   smtpHost: str("SMTP_HOST"),

@@ -5,29 +5,79 @@
  */
 
 import { randomBytes, randomUUID } from "node:crypto";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import * as path from "node:path";
 import type { Prisma, Save as PrismaSave } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
+import { env } from "../../env";
 import { deleteFile, getDownloadUrl, uploadFile } from "../../storage/s3";
 import { verifyGameOwnerAccess } from "../../utils/gameAccess";
 import { Logger } from "../../utils/logger.js";
 
 const logger = new Logger("SaveService");
 
+/** 磁盘回退截图的 key 前缀，用于与 S3 key 区分 */
+const LOCAL_PREFIX = "local:";
+const SCREENSHOT_ROOT = path.resolve(env.saveScreenshotDir);
+
 function isBase64DataUri(str: string): boolean {
   return str.startsWith("data:image/");
 }
 
-async function uploadScreenshotToS3(
-  userId: string,
-  saveId: string,
-  dataUri: string
-): Promise<string> {
+function isLocalKey(key: string): boolean {
+  return key.startsWith(LOCAL_PREFIX);
+}
+
+/** local: key → 磁盘绝对路径；越界返回 null（screenshot 允许客户端直传字符串，需防路径遍历） */
+function localScreenshotPath(key: string): string | null {
+  const abs = path.resolve(SCREENSHOT_ROOT, key.slice(LOCAL_PREFIX.length));
+  return abs.startsWith(SCREENSHOT_ROOT + path.sep) ? abs : null;
+}
+
+/**
+ * 截图落地：优先 S3，S3 不可用（如 RustFS 未启动）时回退磁盘，
+ * 否则整个存档创建会失败（sword2 素材走磁盘，但存档截图仍走 S3）
+ */
+async function persistScreenshot(userId: string, saveId: string, dataUri: string): Promise<string> {
   const base64Data = dataUri.replace(/^data:image\/\w+;base64,/, "");
   const buffer = Buffer.from(base64Data, "base64");
   const key = `saves/${userId}/${saveId}.jpg`;
-  await uploadFile(key, buffer, "image/jpeg");
-  return key;
+
+  try {
+    await uploadFile(key, buffer, "image/jpeg");
+    return key;
+  } catch (e) {
+    logger.warn(`[SaveService] S3 unavailable, screenshot falls back to disk: ${key}`, e);
+    const abs = path.join(SCREENSHOT_ROOT, key);
+    await mkdir(path.dirname(abs), { recursive: true });
+    await writeFile(abs, buffer);
+    return LOCAL_PREFIX + key;
+  }
+}
+
+/** 读回磁盘截图为 data URI（前端已支持 data: 开头，无需额外静态路由） */
+async function readLocalScreenshot(key: string): Promise<string | undefined> {
+  const abs = localScreenshotPath(key);
+  if (!abs) return undefined;
+
+  try {
+    const buffer = await readFile(abs);
+    return `data:image/jpeg;base64,${buffer.toString("base64")}`;
+  } catch (e) {
+    logger.error("[SaveService] Failed to read local screenshot:", e);
+    return undefined;
+  }
+}
+
+async function deleteScreenshot(key: string): Promise<void> {
+  if (!isLocalKey(key)) {
+    await deleteFile(key);
+    return;
+  }
+
+  const abs = localScreenshotPath(key);
+  if (abs) await rm(abs, { force: true });
 }
 
 function generateShareCode(): string {
@@ -116,11 +166,11 @@ export class SaveService {
       }
     }
 
-    // 处理截图：base64 上传 S3，只存 key
+    // 处理截图：base64 上传 S3（不可用则落盘），只存 key
     let screenshotKey: string | null = null;
     if (input.screenshot) {
       if (isBase64DataUri(input.screenshot)) {
-        screenshotKey = await uploadScreenshotToS3(userId, targetSaveId, input.screenshot);
+        screenshotKey = await persistScreenshot(userId, targetSaveId, input.screenshot);
       } else {
         screenshotKey = input.screenshot;
       }
@@ -166,12 +216,12 @@ export class SaveService {
 
     await db.save.delete({ where: { id: saveId } });
 
-    // 删除 S3 截图（仅当存储的是 key，而不是旧的 base64）
+    // 删除截图（仅当存储的是 key，而不是旧的 base64）
     if (existing.screenshot && !isBase64DataUri(existing.screenshot)) {
       try {
-        await deleteFile(existing.screenshot);
+        await deleteScreenshot(existing.screenshot);
       } catch (e) {
-        logger.error("[SaveService] Failed to delete screenshot from S3:", e);
+        logger.error("[SaveService] Failed to delete screenshot:", e);
       }
     }
 
@@ -415,12 +465,12 @@ export class SaveService {
 
     await db.save.delete({ where: { id: saveId } });
 
-    // 删除 S3 截图（仅当存储的是 key，而不是旧的 base64）
+    // 删除截图（仅当存储的是 key，而不是旧的 base64）
     if (existing.screenshot && !isBase64DataUri(existing.screenshot)) {
       try {
-        await deleteFile(existing.screenshot);
+        await deleteScreenshot(existing.screenshot);
       } catch (e) {
-        logger.error("[SaveService] Failed to delete screenshot from S3:", e);
+        logger.error("[SaveService] Failed to delete screenshot:", e);
       }
     }
 
@@ -440,10 +490,12 @@ export class SaveService {
   }
 
   private async toOutput(row: Omit<PrismaSave, "data">) {
-    // screenshot 可能是旧的 base64 data URI，或新的 S3 key（私有 bucket）。
-    // S3 key 需签名为临时可访问 URL，前端才能直接用作 <img src>。
+    // screenshot 可能是旧的 base64 data URI、S3 key（私有 bucket），或磁盘回退的 local: key。
+    // S3 key 需签名为临时可访问 URL，local: key 读回为 data URI，前端才能直接用作 <img src>。
     let screenshot = row.screenshot ?? undefined;
-    if (screenshot && !isBase64DataUri(screenshot)) {
+    if (screenshot && isLocalKey(screenshot)) {
+      screenshot = await readLocalScreenshot(screenshot);
+    } else if (screenshot && !isBase64DataUri(screenshot)) {
       try {
         screenshot = await getDownloadUrl(screenshot);
       } catch (e) {
