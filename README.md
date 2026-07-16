@@ -317,18 +317,19 @@ The project includes a VS Code-style game editor with Activity Bar, Sidebar, and
 | `@miu2d/ui` | Generic UI components (no business deps) |
 | `@miu2d/shared` | i18n, tRPC client, React contexts |
 
-Also included: `resources/` (game assets), `docs/` (format specs), `JxqyHD/` (C# reference from the original engine).
+Also included: `resources/` (game assets), `docs/` (format specs), `scripts/` (asset extraction & integrity tools).
 
 ---
 
 ## Quick Start
 
-**Requirements:** Node.js 18+, pnpm 9+, modern browser with WebGL
+**Requirements:** Node.js 24, pnpm 10, Rust (for the WASM module; `wasm-pack` is auto-installed), modern browser with WebGL
 
 ```bash
 git clone https://github.com/nicologies/miu2d.git
 cd miu2d
 pnpm install
+pnpm build:wasm     # build the Rust WASM module (pathfinder, decoders)
 pnpm dev            # → http://localhost:5274
 ```
 
@@ -349,9 +350,10 @@ just dev            # web + server concurrently
 | `just dev` | Full-stack dev (web + server + db) |
 | `pnpm tsc` | Type check all packages |
 | `pnpm lint` | Biome lint |
-| `pnpm --filter @miu2d/engine test` | Run engine tests (vitest) |
+| `pnpm test` | Run tests (vitest) |
 | `just convert` | Batch convert game resources (Rust CLI) |
 | `just convert-verify` | Pixel-perfect conversion verification |
+| `node scripts/check-game-refs.ts <game>` | Referential-integrity check: every tile/script/ini a game references must resolve |
 
 ---
 

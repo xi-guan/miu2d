@@ -318,18 +318,19 @@ pnpm monorepo 中的 11 个包，总计约 **176,000 行**代码：
 | `@miu2d/ui` | 通用 UI 组件（无业务依赖） |
 | `@miu2d/shared` | i18n、tRPC 客户端、React Context |
 
-还包括：`resources/`（游戏资源）、`docs/`（格式规范文档）、`JxqyHD/`（原版引擎 C# 参考代码）。
+还包括：`resources/`（游戏资源）、`docs/`（格式规范文档）、`scripts/`（素材提取与完整性检查工具）。
 
 ---
 
 ## 快速开始
 
-**环境要求：** Node.js 18+、pnpm 9+、支持 WebGL 的现代浏览器
+**环境要求：** Node.js 24、pnpm 10、Rust（构建 WASM 模块，`wasm-pack` 会自动安装）、支持 WebGL 的现代浏览器
 
 ```bash
 git clone https://github.com/nicologies/miu2d.git
 cd miu2d
 pnpm install
+pnpm build:wasm     # 构建 Rust WASM 模块（寻路、解码器）
 pnpm dev            # → http://localhost:5274
 ```
 
@@ -350,9 +351,10 @@ just dev            # 同时启动 web + server
 | `just dev` | 全栈开发（web + server + db） |
 | `pnpm tsc` | 全包类型检查 |
 | `pnpm lint` | Biome 代码检查 |
-| `pnpm --filter @miu2d/engine test` | 运行引擎测试（vitest） |
+| `pnpm test` | 运行测试（vitest） |
 | `just convert` | 批量转换游戏资源（Rust CLI） |
 | `just convert-verify` | 像素级转换验证 |
+| `node scripts/check-game-refs.ts <game>` | 引用完整性检查：游戏引用的每个 tile/脚本/ini 必须可解析 |
 
 ---
 

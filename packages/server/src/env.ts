@@ -39,6 +39,8 @@ export const env = {
 
   // ---------- Server ----------
   port: num("PORT", 4000),
+  /** max-age seconds for public asset responses; only applied in production */
+  assetCacheMaxAge: num("ASSET_CACHE_MAX_AGE", 86400),
 
   // ---------- Database ----------
   databaseUrl: str("DATABASE_URL"),

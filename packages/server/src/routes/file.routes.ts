@@ -14,6 +14,7 @@ import { stream } from "hono/streaming";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { db } from "../db/client";
+import { env } from "../env";
 import * as s3 from "../storage/s3";
 import { resolveFilePath } from "../utils/file";
 import { Logger } from "../utils/logger";
@@ -23,6 +24,25 @@ const __dirname = path.dirname(__filename);
 
 const logger = new Logger("FileRoutes");
 const RESOURCE_ROOT = path.resolve(__dirname, "../../../..", "resources");
+
+// dev keeps no-cache so re-converted local assets show up immediately; prod assets change only via re-import
+const CACHE_CONTROL = env.isProd ? `public, max-age=${env.assetCacheMaxAge}` : "no-cache";
+
+// every asset request used to cost a slug lookup + a recursive CTE; short TTL keeps fresh imports visible
+const CACHE_TTL_MS = 60_000;
+const gameIdCache = new Map<string, { v: string | null; exp: number }>();
+const fileCache = new Map<string, { v: Awaited<ReturnType<typeof resolveFilePath>>; exp: number }>();
+
+function cacheGet<T>(map: Map<string, { v: T; exp: number }>, key: string): { v: T } | undefined {
+  const hit = map.get(key);
+  return hit && hit.exp > Date.now() ? hit : undefined;
+}
+
+function cacheSet<T>(map: Map<string, { v: T; exp: number }>, key: string, v: T): void {
+  // crude size bound: full reset beats unbounded growth from bogus paths
+  if (map.size >= 20_000) map.clear();
+  map.set(key, { v, exp: Date.now() + CACHE_TTL_MS });
+}
 
 const MIME_TYPES: Record<string, string> = {
   ".asf": "application/octet-stream",
@@ -75,15 +95,30 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
     logger.debug(`[getResource] gameSlug=${gameSlug}, filePath=${filePath}`);
 
     // 1. 根据 slug 获取游戏
-    const game = await db.game.findFirst({ where: { slug: gameSlug }, select: { id: true } });
+    let gameId: string | null;
+    const gameHit = cacheGet(gameIdCache, gameSlug);
+    if (gameHit) {
+      gameId = gameHit.v;
+    } else {
+      const game = await db.game.findFirst({ where: { slug: gameSlug }, select: { id: true } });
+      gameId = game?.id ?? null;
+      cacheSet(gameIdCache, gameSlug, gameId);
+    }
 
-    if (!game) {
+    if (!gameId) {
       return c.json({ error: "Game not found" }, 404);
     }
 
     // 2. 解析路径，找到目标文件
     const pathSegments = filePath.split("/").filter(Boolean);
-    const file = await resolveFilePath(game.id, pathSegments);
+    let file: Awaited<ReturnType<typeof resolveFilePath>>;
+    const fileHit = cacheGet(fileCache, `${gameId}:${filePath}`);
+    if (fileHit) {
+      file = fileHit.v;
+    } else {
+      file = await resolveFilePath(gameId, pathSegments);
+      cacheSet(fileCache, `${gameId}:${filePath}`, file);
+    }
 
     if (file) {
       if (file.type !== "file" || !file.storageKey) {
@@ -101,7 +136,7 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
       } = await s3.getFileStream(file.storageKey, ifNoneMatch);
 
       if (notModified) {
-        c.header("Cache-Control", "no-cache");
+        c.header("Cache-Control", CACHE_CONTROL);
         if (etag) c.header("ETag", etag);
         return c.body(null, 304);
       }
@@ -111,7 +146,7 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
       if (contentLength !== undefined) {
         c.header("Content-Length", String(contentLength));
       }
-      c.header("Cache-Control", "no-cache");
+      c.header("Cache-Control", CACHE_CONTROL);
       if (etag) c.header("ETag", etag);
 
       // 5. 流式传输
@@ -144,7 +179,7 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
     }
 
     c.header("Content-Type", detectMimeType(localPath) || "application/octet-stream");
-    c.header("Cache-Control", "no-cache");
+    c.header("Cache-Control", CACHE_CONTROL);
 
     const fileStream = fs.createReadStream(localPath);
     return new Response(

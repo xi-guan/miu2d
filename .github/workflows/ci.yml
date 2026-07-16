@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: tsc / lint / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # generate-only; nothing in CI ever connects to a database
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/engine-wasm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:wasm
+      - run: pnpm --filter @miu2d/types build
+      - run: pnpm --filter @miu2d/server db:generate
+      - run: pnpm --filter @miu2d/server gen:trpc
+      - run: pnpm -r tsc
+      - run: pnpm lint
+      - run: pnpm --filter @miu2d/engine test
+
+  converter:
+    name: cargo check (converter)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/converter
+      - run: cargo check --manifest-path packages/converter/Cargo.toml --all-targets

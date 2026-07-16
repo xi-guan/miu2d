@@ -21,6 +21,9 @@
       "dependsOn": ["^tsc"],
       "cache": false
     },
+    "test": {
+      "cache": false
+    },
     "lint": {
       "dependsOn": ["^lint"],
       "cache": false

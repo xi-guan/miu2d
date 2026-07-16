@@ -18,8 +18,9 @@
     "format": "biome format --write packages/",
     "check": "biome check --write packages/",
     "tsc": "pnpm -r tsc",
+    "test": "turbo run test",
     "preview": "pnpm --filter @miu2d/web preview",
-    "db:up": "docker-compose up -d db minio",
+    "db:up": "docker-compose up -d db rustfs",
     "db:down": "docker-compose down",
     "db:migrate": "pnpm --filter @miu2d/server db:migrate",
     "db:seed": "pnpm --filter @miu2d/server db:seed"
