@@ -912,3 +912,6 @@ script\map\map118_泰山\罗天强打败.txt
 script\map\map100_天王岛\trap04.txt
 script\map\map034_1_海边小渔村\贾老实对话.txt
 script\map\map036_渔夫家\Trap01.txt
+script\map\map027_临安城赌坊\吕文才与宋兵死亡.ini
+script\map\map023_临安城妓院\妓女+嫖客1对话.txt
+script\map\map023_临安城妓院\妓女+嫖客2对话.txt

@@ -86,8 +86,96 @@ TOKEN_RE = re.compile(
 )
 
 
+def tile_names_from_maps() -> set:
+    """read each .map's mpc table -- the tile names are recorded there verbatim.
+
+    tile names are arbitrary (dt-1, zz-3, nnn, t-33, ...), so the numeric sweep below
+    misses ~34% of them; those blobs then sit unreferenced in _unnamed/ and the map
+    renders with a black ground. requires map.pak to be unpacked first (see README).
+    """
+    cands = set()
+    map_dir = os.path.join(REPO, "resources/sword1/map")
+    if not os.path.isdir(map_dir):
+        return cands
+    for fn in os.listdir(map_dir):
+        if not fn.lower().endswith(".map"):
+            continue
+        stem = fn[:-4]
+        with open(os.path.join(map_dir, fn), "rb") as f:
+            data = f.read()
+        if len(data) < 16512 or data[:12] != b"MAP File Ver":
+            continue
+        # a few maps keep their tiles under a dir that is not the .map stem
+        # (map120-1_风波亭 -> mpc\map\map120-1\); non-matching shapes are dropped by hash
+        dirs = {stem, re.sub(r"-\d+$", "", stem), stem.split("_", 1)[0]}
+        for k in range(255):
+            off = 192 + k * 64
+            raw = data[off : off + 32].split(b"\x00", 1)[0]
+            if not raw:
+                continue
+            name = raw.decode("gbk", errors="ignore")
+            for d in dirs:
+                cands.add(f"mpc\\map\\{d}\\{name}")
+    return cands
+
+
+def script_names_from_refs() -> set:
+    """harvest map-scoped script names from the files that reference them.
+
+    death/interact scripts are named verbatim in .npc/.obj (DeathScript=, ScriptFile=)
+    and in SetMapTrap()/RunScript() calls. some carry a '.ini' ext while living in the
+    script\\map dir, and some contain '+' -- both slip past the generic token sweep, so
+    the target sits unrecovered in _unnamed/ and the quest dead-ends at runtime (e.g.
+    map027 赌坊: killing 吕文才 fires a missing DeathScript -> no 令牌, player stuck).
+    requires ini/script paks unpacked first. non-matching shapes drop out by hash.
+    """
+    cands = set()
+    sw = os.path.join(REPO, "resources/sword1")
+    keys = ("DeathScript", "ScriptFile", "TimerScript", "TimerScriptFile")
+    ini_dir = os.path.join(sw, "ini")
+    if os.path.isdir(ini_dir):
+        for root, _, files in os.walk(ini_dir):
+            for fn in files:
+                if not (fn.endswith(".npc") or fn.endswith(".obj")):
+                    continue
+                txt = open(os.path.join(root, fn), encoding="utf-8", errors="ignore").read()
+                m = re.search(r"^Map=(.+?)\.map", txt, re.M)
+                if not m:
+                    continue
+                mapdir = m.group(1).strip()
+                for k in keys:
+                    for mv in re.finditer(rf"^{k}=(.+?)\s*$", txt, re.M):
+                        v = mv.group(1).strip()
+                        if v:
+                            base = re.sub(r"\.(txt|ini)$", "", v, flags=re.I)
+                            cands.add(f"script\\map\\{mapdir}\\{base}.txt")
+                            cands.add(f"script\\map\\{mapdir}\\{base}.ini")
+    call_re = re.compile(
+        r'(?:SetMapTrap\s*\([^,]*,\s*|RunScript\s*\(|CallScript\s*\()\s*"([^"]+)"', re.I
+    )
+    smap = os.path.join(sw, "script/map")
+    if os.path.isdir(smap):
+        for root, _, files in os.walk(smap):
+            mapdir = os.path.basename(root)
+            for fn in files:
+                if not fn.endswith(".txt"):
+                    continue
+                txt = open(os.path.join(root, fn), encoding="utf-8", errors="ignore").read()
+                for mv in call_re.finditer(txt):
+                    base = re.sub(r"\.(txt|ini)$", "", mv.group(1).strip(), flags=re.I)
+                    cands.add(f"script\\map\\{mapdir}\\{base}.txt")
+                    cands.add(f"script\\map\\{mapdir}\\{base}.ini")
+    return cands
+
+
 def gen_candidates():
     cands = set()
+
+    # 0. tile names straight from the .map mpc tables (authoritative, no guessing)
+    cands |= tile_names_from_maps()
+
+    # 0b. map-scoped script names from .npc/.obj + SetMapTrap/RunScript references
+    cands |= script_names_from_refs()
 
     # 1. yueying tree, translated to pak paths
     for root, _, files in os.walk(YUEYING):

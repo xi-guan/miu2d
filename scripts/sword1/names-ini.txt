@@ -1634,3 +1634,8 @@ ini\npc\站立黑衣蒙面人.ini
 ini\objres\body-宋兵（枪兵）.ini
 ini\npcres\npcres_map016居民18江老太.ini
 ini\npcres\npcres082_食人鱼.ini
+ini\npcres\npcres_map023妓女+嫖客1.ini
+ini\npcres\npcres_map023妓女+嫖客2.ini
+ini\npcres\npcres055_碧霞岛杀手+武功1.ini
+ini\npcres\npcres055_碧霞岛杀手+武功2.ini
+ini\npcres\npcres055_碧霞岛杀手+武功3.ini
