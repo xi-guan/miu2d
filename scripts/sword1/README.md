@@ -42,6 +42,10 @@ python3 scripts/sword1/harvest_names.py
 
 # 4. 转换 (ASF/MPC→MSF, MAP→MMF, GBK→UTF-8)
 ./packages/converter/target/release/convert-all resources/sword1
+
+# 5. 变体图目录别名 (见「踩过的坑」末条: -1 变体图的 tile 存在基础图目录下)
+ln -s map113_五剑堂正厅 resources/sword1/mpc/map/map113_五剑堂正厅-1
+ln -s map120-1 resources/sword1/mpc/map/map120-1_风波亭
 ```
 
 ## 名称恢复率
@@ -72,15 +76,16 @@ node scripts/check-game-refs.ts sword1   # 遍历每处引用, 按引擎规则�
 
 未命中的落 `_unnamed/<pak>/<hash>.<ext>`, 数据不丢, 只是路径不可被引用。
 
-tile 引用 1317 个, 尚缺 24 个 (1.8%), 涉 4 张图:
+tile 引用 1317 个, 尚缺 8 个 (0.6%), 涉 3 张图 — pak 里确实没有, 任何路径形状都不命中,
+原始数据即缺:
 
 ```
-map036_渔夫家    3   ┐
-map071_朱仙镇    1   ├ pak 里确实没有, 任何路径形状都不命中 — 原始数据即缺
-map077_岳飞主帐营 4   ┘
-map113_五剑堂正厅-1 10  ┐ blob 在, 但存在基础图目录下 (mpc\map\map113_五剑堂正厅\),
-map120-1_风波亭    6   ┘ 而引擎按 .map 名拼 msf/map/<图名>/ → 找不到。需目录别名
+map036_渔夫家 3    map071_朱仙镇 1    map077_岳飞主帐营 4
 ```
+
+map113_五剑堂正厅-1 / map120-1_风波亭 曾各缺 10/6 个: blob 在基础图目录下
+(`mpc\map\map113_五剑堂正厅\` 与 `mpc\map\map120-1\`), 而引擎按 .map 名拼
+`msf/map/<图名>/` → 找不到。已用复现步骤第 5 步的目录别名解决 (2026-07-16)。
 
 `brute-hash` 用于反推未知的路径形状 (已用它确定 tile 路径是 `mpc\map\<地图名>\<序号>.mpc`):
 
