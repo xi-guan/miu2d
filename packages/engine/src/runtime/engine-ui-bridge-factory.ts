@@ -5,6 +5,7 @@
 
 import type { TypedEventEmitter } from "../events/event-emitter";
 import { type GameEventMap, GameEvents } from "../events/game-events";
+import type { Card } from "../gui/doudizhu/card-engine";
 import type { MemoListManager } from "../gui/memo-list-manager";
 import { type UIBridgeDeps, UIBridgeImpl } from "../gui/ui-bridge";
 import type { GuiManagerState, UIBridge } from "../gui/ui-types";
@@ -147,7 +148,7 @@ export function createEngineUIBridge(
     },
     doudizhu: {
       bid: (bid) => gm.doudizhuManager.playerBid(bid),
-      play: (cards) => gm.doudizhuManager.playerPlay(cards as any),
+      play: (cards) => gm.doudizhuManager.playerPlay(cards as Card[]),
       pass: () => gm.doudizhuManager.playerPass(),
       closeDoudizhu: () => {
         gm.doudizhuManager.endGame();

@@ -60,9 +60,6 @@
       }
     }
   ],
-  "files": {
-    "experimentalScannerIgnores": [".data/"]
-  },
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -95,6 +92,7 @@
     }
   },
   "files": {
+    "experimentalScannerIgnores": [".data/", "resources/", "games-raw/", "node_modules/"],
     "includes": [
       "packages/*/src/**",
       "packages/*/*.ts",
