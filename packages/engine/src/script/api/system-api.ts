@@ -8,18 +8,33 @@ import { BlockingEvent, type BlockingResolver } from "../blocking-resolver";
 import type { DialogAPI, InputAPI, SaveAPI, ScriptRunnerAPI, VariableAPI } from "./game-api";
 import type { ScriptCommandContext } from "./types";
 
+// <color=X> is stateful with no closing tag, so a page break must re-open the color on the next page
+export function splitDialogPages(text: string): string[] {
+  const pages: string[] = [];
+  let color: string | null = null;
+  for (const raw of text.split(/<enter>/i)) {
+    const trimmed = raw.trim();
+    if (trimmed) {
+      pages.push(color ? `<color=${color}>${trimmed}` : trimmed);
+    }
+    for (const m of raw.matchAll(/<color=([^>]+)>/gi)) {
+      const c = m[1].trim();
+      // Black/Default both mean "back to default" in original scripts
+      color = /^(black|default)$/i.test(c) ? null : c;
+    }
+  }
+  return pages;
+}
+
 export function createDialogAPI(ctx: ScriptCommandContext, resolver: BlockingResolver): DialogAPI {
   const { guiManager, talkTextList } = ctx;
 
   return {
     show: async (text, portraitIndex) => {
       // 按 <Enter>/<enter>（大小写不敏感）拆分为多页，逐页展示（同 TalkLabel.splitTalkString）
-      const pages = text.split(/<enter>/i);
-      for (const page of pages) {
-        const trimmed = page.trim();
-        if (!trimmed) continue;
+      for (const page of splitDialogPages(text)) {
         ctx.clearMouseInput?.();
-        guiManager.showDialog(trimmed, portraitIndex);
+        guiManager.showDialog(page, portraitIndex);
         await resolver.waitForEvent(BlockingEvent.DIALOG_CLOSED);
       }
     },
@@ -28,12 +43,9 @@ export function createDialogAPI(ctx: ScriptCommandContext, resolver: BlockingRes
       const details = talkTextList.getTextDetails(startId, endId);
       for (const detail of details) {
         // 同 show()，按 <Enter> 拆分为多页
-        const pages = detail.text.split(/<enter>/i);
-        for (const page of pages) {
-          const trimmed = page.trim();
-          if (!trimmed) continue;
+        for (const page of splitDialogPages(detail.text)) {
           ctx.clearMouseInput?.();
-          guiManager.showDialog(trimmed, detail.portraitIndex);
+          guiManager.showDialog(page, detail.portraitIndex);
           await resolver.waitForEvent(BlockingEvent.DIALOG_CLOSED);
         }
       }
