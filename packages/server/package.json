@@ -10,9 +10,8 @@
   "scripts": {
     "gen:trpc": "tsx scripts/generate-trpc-types.ts",
     "gen:trpc:watch": "tsx scripts/generate-trpc-types.ts --watch",
-    "dev": "pnpm db:generate && tsx watch --tsconfig tsconfig.dev.json src/main.ts",
-    "prebuild": "pnpm -C ../types build && pnpm -C ../shared build:locales && prisma generate",
-    "build": "pnpm gen:trpc && rolldown -c rolldown.config.mjs",
+    "dev": "bun run db:generate && tsx watch --tsconfig tsconfig.dev.json src/main.ts",
+    "build": "bun run --cwd ../types build && bun run --cwd ../shared build:locales && prisma generate && bun run gen:trpc && rolldown -c rolldown.config.mjs",
     "start": "node dist/main.js",
     "tsc": "tsc --noEmit",
     "db:generate": "prisma generate",

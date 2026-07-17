@@ -20,11 +20,13 @@ jobs:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      # node stays the runtime for vite/tsc/vitest; bun is the package manager
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -34,14 +36,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: packages/engine-wasm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build:wasm
-      - run: pnpm --filter @miu2d/types build
-      - run: pnpm --filter @miu2d/server db:generate
-      - run: pnpm --filter @miu2d/server gen:trpc
-      - run: pnpm -r tsc
-      - run: pnpm lint
-      - run: pnpm --filter @miu2d/engine test
+      - run: bun install --frozen-lockfile
+      - run: bun run build:wasm
+      - run: bun run --filter=@miu2d/types build
+      - run: bun run --filter=@miu2d/server db:generate
+      - run: bun run --filter=@miu2d/server gen:trpc
+      - run: bun run tsc
+      - run: bun run lint
+      - run: bun run --filter=@miu2d/engine test
 
   converter:
     name: cargo check (converter)

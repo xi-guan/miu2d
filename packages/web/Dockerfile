@@ -1,14 +1,17 @@
 # 构建阶段
 FROM node:24-alpine AS builder
 
-# 启用 corepack 以使用 pnpm
-RUN corepack enable && corepack prepare pnpm@10.16.1 --activate
+# bun 只当包管理器, node 仍是运行时 (alpine 需 musl 版二进制)
+COPY --from=oven/bun:1.3.14-alpine /usr/local/bin/bun /usr/local/bin/bun
 
 WORKDIR /app
 
 # 复制 workspace 配置文件
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY bun.lock package.json ./
 COPY tsconfig.base.json ./
+
+# bun --frozen-lockfile 要求 lockfile 里全部 workspace 成员的 package.json 在场
+COPY packages/converter/package.json ./packages/converter/
 
 # 复制 types 包（web 间接依赖，需要构建）
 COPY packages/types/package.json ./packages/types/
@@ -63,14 +66,14 @@ COPY packages/web/vite.config.ts ./packages/web/
 COPY packages/web/index.html ./packages/web/
 
 # 安装所有依赖
-RUN pnpm install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 # 构建依赖包
-RUN pnpm --filter @miu2d/types build
+RUN bun run --filter=@miu2d/types build
 # 生成 Prisma Client（web tsc 链路需要 @prisma/client 类型）
-RUN pnpm --filter @miu2d/server db:generate
+RUN bun run --filter=@miu2d/server db:generate
 # 生成 server 的 tRPC 类型（web 依赖）
-RUN pnpm --filter @miu2d/server gen:trpc
+RUN bun run --filter=@miu2d/server gen:trpc
 
 # 复制 web 源代码和静态资源
 COPY packages/web/src ./packages/web/src
@@ -92,7 +95,7 @@ RUN COMMIT_HASH=$COMMIT_HASH \
     VITE_DEMO_RESOURCES_DOMAIN=$VITE_DEMO_RESOURCES_DOMAIN \
     VITE_S3_BASE_URL=$VITE_S3_BASE_URL \
     CACHE_BUST=$CACHE_BUST \
-    pnpm build
+    bun run build
 
 # 生产阶段 - 使用 nginx 静态服务
 FROM nginx:alpine AS runner

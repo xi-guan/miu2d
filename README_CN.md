@@ -125,7 +125,7 @@ Miu2D 是一个 **176,000 行**的 2D ARPG 引擎，使用 TypeScript 和 Rust �
 | 数据库 | PostgreSQL 17 · RustFS / S3 |
 | 校验 | Zod 4（前后端共享 Schema） |
 | 代码质量 | Biome (lint + format) · TypeScript strict 模式 |
-| 项目管理 | pnpm workspaces（11 个包） |
+| 项目管理 | bun workspaces（11 个包） |
 
 ---
 
@@ -302,7 +302,7 @@ Sprite
 
 ## 项目结构
 
-pnpm monorepo 中的 11 个包，总计约 **176,000 行**代码：
+bun workspaces monorepo 中的 11 个包，总计约 **176,000 行**代码：
 
 | 包名 | 职责 |
 |------|------|
@@ -324,14 +324,14 @@ pnpm monorepo 中的 11 个包，总计约 **176,000 行**代码：
 
 ## 快速开始
 
-**环境要求：** Node.js 24、pnpm 10、Rust（构建 WASM 模块，`wasm-pack` 会自动安装）、支持 WebGL 的现代浏览器
+**环境要求：** Node.js 24、bun 1.3、Rust（构建 WASM 模块，`wasm-pack` 会自动安装）、支持 WebGL 的现代浏览器
 
 ```bash
 git clone https://github.com/nicologies/miu2d.git
 cd miu2d
-pnpm install
-pnpm build:wasm     # 构建 Rust WASM 模块（寻路、解码器）
-pnpm dev            # → http://localhost:5274
+bun install
+bun run build:wasm     # 构建 Rust WASM 模块（寻路、解码器）
+bun run dev            # → http://localhost:5274
 ```
 
 ### 全栈启动（含后端 + 数据库）
@@ -347,11 +347,11 @@ just dev            # 同时启动 web + server
 
 | 命令 | 用途 |
 |------|------|
-| `pnpm dev` | 前端开发服务器（端口 5274） |
+| `bun run dev` | 前端开发服务器（端口 5274） |
 | `just dev` | 全栈开发（web + server + db） |
-| `pnpm tsc` | 全包类型检查 |
-| `pnpm lint` | Biome 代码检查 |
-| `pnpm test` | 运行测试（vitest） |
+| `bun run tsc` | 全包类型检查 |
+| `bun run lint` | Biome 代码检查 |
+| `bun run test` | 运行测试（vitest） |
 | `just convert` | 批量转换游戏资源（Rust CLI） |
 | `just convert-verify` | 像素级转换验证 |
 | `node scripts/check-game-refs.ts <game>` | 引用完整性检查：游戏引用的每个 tile/脚本/ini 必须可解析 |
@@ -387,7 +387,7 @@ just dev            # 同时启动 web + server
 
 | 目标 | 方式 |
 |------|------|
-| **前端** | Vercel — `pnpm build:web` → 静态 SPA |
+| **前端** | Vercel — `bun run build:web` → 静态 SPA |
 | **全栈** | Docker Compose — PostgreSQL + RustFS + Hono + Nginx |
 
 详见 [deploy/](deploy/) 目录中的生产 Docker 配置。
@@ -397,7 +397,7 @@ just dev            # 同时启动 web + server
 ## 参与贡献
 
 1. Fork → 功能分支 → 参考[开发指南](.github/copilot-instructions.md) → PR
-2. 提交前运行 `pnpm tsc` 和 `pnpm lint`
+2. 提交前运行 `bun run tsc` 和 `bun run lint`
 
 ---
 

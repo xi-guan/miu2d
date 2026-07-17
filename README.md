@@ -125,7 +125,7 @@ Most web game projects reach for PixiJS, Phaser, or a WASM-compiled Unity/Godot 
 | Database | PostgreSQL 17 · RustFS / S3 |
 | Validation | Zod 4 (shared schemas across client & server) |
 | Quality | Biome (lint + format) · TypeScript strict mode |
-| Monorepo | pnpm workspaces (11 packages) |
+| Monorepo | bun workspaces (11 packages) |
 
 ---
 
@@ -301,7 +301,7 @@ The project includes a VS Code-style game editor with Activity Bar, Sidebar, and
 
 ## Project Structure
 
-11 packages in a pnpm monorepo, **~176,000 lines** total:
+11 packages in a bun-workspaces monorepo, **~176,000 lines** total:
 
 | Package | Role |
 |---------|------|
@@ -323,14 +323,14 @@ Also included: `resources/` (game assets), `docs/` (format specs), `scripts/` (a
 
 ## Quick Start
 
-**Requirements:** Node.js 24, pnpm 10, Rust (for the WASM module; `wasm-pack` is auto-installed), modern browser with WebGL
+**Requirements:** Node.js 24, bun 1.3, Rust (for the WASM module; `wasm-pack` is auto-installed), modern browser with WebGL
 
 ```bash
 git clone https://github.com/nicologies/miu2d.git
 cd miu2d
-pnpm install
-pnpm build:wasm     # build the Rust WASM module (pathfinder, decoders)
-pnpm dev            # → http://localhost:5274
+bun install
+bun run build:wasm     # build the Rust WASM module (pathfinder, decoders)
+bun run dev            # → http://localhost:5274
 ```
 
 ### Full Stack (with backend + database)
@@ -346,11 +346,11 @@ just dev            # web + server concurrently
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm dev` | Frontend dev server (port 5274) |
+| `bun run dev` | Frontend dev server (port 5274) |
 | `just dev` | Full-stack dev (web + server + db) |
-| `pnpm tsc` | Type check all packages |
-| `pnpm lint` | Biome lint |
-| `pnpm test` | Run tests (vitest) |
+| `bun run tsc` | Type check all packages |
+| `bun run lint` | Biome lint |
+| `bun run test` | Run tests (vitest) |
 | `just convert` | Batch convert game resources (Rust CLI) |
 | `just convert-verify` | Pixel-perfect conversion verification |
 | `node scripts/check-game-refs.ts <game>` | Referential-integrity check: every tile/script/ini a game references must resolve |
@@ -386,7 +386,7 @@ just dev            # web + server concurrently
 
 | Target | Method |
 |--------|--------|
-| **Frontend** | Vercel — `pnpm build:web` → static SPA |
+| **Frontend** | Vercel — `bun run build:web` → static SPA |
 | **Full Stack** | Docker Compose — PostgreSQL + RustFS + Hono + Nginx |
 
 See [deploy/](deploy/) for production Docker configs.
@@ -396,7 +396,7 @@ See [deploy/](deploy/) for production Docker configs.
 ## Contributing
 
 1. Fork → feature branch → reference the [dev guide](.github/copilot-instructions.md) → PR
-2. Run `pnpm tsc` and `pnpm lint` before submitting
+2. Run `bun run tsc` and `bun run lint` before submitting
 
 ---
 

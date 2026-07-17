@@ -1,14 +1,24 @@
 # 构建阶段
 FROM node:24-bookworm-slim AS builder
 
-# 启用 corepack 以使用 pnpm
-RUN corepack enable && corepack prepare pnpm@10.16.1 --activate
+# bun 只当包管理器, node 仍是运行时
+COPY --from=oven/bun:1.3.14 /usr/local/bin/bun /usr/local/bin/bun
 
 WORKDIR /app
 
 # 复制 workspace 配置文件
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY bun.lock package.json ./
 COPY tsconfig.base.json ./
+
+# bun --frozen-lockfile 要求 lockfile 里全部 workspace 成员的 package.json 在场
+COPY packages/converter/package.json ./packages/converter/
+COPY packages/dashboard/package.json ./packages/dashboard/
+COPY packages/engine/package.json ./packages/engine/
+COPY packages/engine-wasm/package.json ./packages/engine-wasm/
+COPY packages/game/package.json ./packages/game/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/viewer/package.json ./packages/viewer/
+COPY packages/web/package.json ./packages/web/
 
 # 复制 types 包配置和源代码（server 依赖 types）
 COPY packages/types/package.json ./packages/types/
@@ -28,7 +38,7 @@ COPY packages/server/tsconfig.build.json ./packages/server/
 COPY packages/server/rolldown.config.mjs ./packages/server/
 
 # 安装所有依赖（包括 devDependencies，构建时需要）
-RUN pnpm install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 # 复制源代码和脚本
 COPY packages/server/src ./packages/server/src
@@ -37,21 +47,30 @@ COPY packages/server/prisma ./packages/server/prisma
 
 # 构建应用（prebuild 生成依赖，@miu2d/* 工作区包全部内联）
 WORKDIR /app/packages/server
-RUN pnpm build
+RUN bun run build
 
 # 生产阶段
 FROM node:24-bookworm-slim AS runner
 
-# 启用 corepack
-RUN corepack enable && corepack prepare pnpm@10.16.1 --activate
+COPY --from=oven/bun:1.3.14 /usr/local/bin/bun /usr/local/bin/bun
 
 WORKDIR /app
 
 # 复制必要的配置文件
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY bun.lock package.json ./
 COPY packages/types/package.json ./packages/types/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/server/package.json ./packages/server/
+
+# bun --frozen-lockfile 要求 lockfile 里全部 workspace 成员的 package.json 在场
+COPY packages/converter/package.json ./packages/converter/
+COPY packages/dashboard/package.json ./packages/dashboard/
+COPY packages/engine/package.json ./packages/engine/
+COPY packages/engine-wasm/package.json ./packages/engine-wasm/
+COPY packages/game/package.json ./packages/game/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/viewer/package.json ./packages/viewer/
+COPY packages/web/package.json ./packages/web/
 
 # 从构建阶段复制构建产物
 COPY --from=builder /app/packages/server/dist ./packages/server/dist
@@ -60,7 +79,7 @@ COPY --from=builder /app/packages/server/dist ./packages/server/dist
 COPY --from=builder /app/packages/server/prisma ./packages/server/prisma
 
 # 只安装生产依赖
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+RUN bun install --production --frozen-lockfile --ignore-scripts
 
 # 设置工作目录
 WORKDIR /app/packages/server
