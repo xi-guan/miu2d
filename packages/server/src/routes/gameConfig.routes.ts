@@ -12,7 +12,7 @@
 import { createDefaultGameConfig, GameConfigDataSchema } from "@miu2d/types";
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
-import sharp from "sharp";
+import { Jimp } from "jimp";
 import { db } from "../db/client";
 import type { Prisma } from "../db/generated/prisma/client";
 import { gameConfigService } from "../modules/gameConfig/gameConfig.service";
@@ -45,12 +45,11 @@ function allLogoKeys(gameId: string): string[] {
  * 将原图缩放并生成所有 PWA 尺寸变体，返回 Buffer 数组
  */
 async function generateLogoVariants(src: Buffer): Promise<Array<{ size: LogoSize; buf: Buffer }>> {
+  const image = await Jimp.read(src);
   const results: Array<{ size: LogoSize; buf: Buffer }> = [];
   for (const size of LOGO_SIZES) {
-    const buf = await sharp(src)
-      .resize(size, size, { fit: "cover", kernel: "lanczos3" })
-      .png()
-      .toBuffer();
+    // cover mutates in place, so clone per size
+    const buf = await image.clone().cover({ w: size, h: size }).getBuffer("image/png");
     results.push({ size, buf });
   }
   return results;
@@ -257,11 +256,11 @@ gameConfigRoutes.post(":gameSlug/api/logo", async (c) => {
     }
 
     // 验证图片尺寸：必须 >= 512x512
-    const metadata = await sharp(body).metadata();
-    if (!metadata.width || !metadata.height || metadata.width < 512 || metadata.height < 512) {
+    const { width, height } = (await Jimp.read(body)).bitmap;
+    if (!width || !height || width < 512 || height < 512) {
       return c.json(
         {
-          error: `Logo must be at least 512x512 pixels (got ${metadata.width ?? 0}x${metadata.height ?? 0})`,
+          error: `Logo must be at least 512x512 pixels (got ${width}x${height})`,
         },
         400
       );

@@ -1,5 +1,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+server_image := "gitea.susie.se/coaster/miu2d-server"
+
 _default:
     @just --list --unsorted --list-heading '' --list-prefix='- '
 
@@ -126,3 +128,24 @@ convert-verify:
     cargo run --release --manifest-path packages/converter/Cargo.toml --bin verify -- resources/asf
     echo "→ verifying mpc/msf lossless"
     cargo run --release --manifest-path packages/converter/Cargo.toml --bin verify_mpc -- resources/mpc
+
+# build server image (amd64 + arm64), push manifest to gitea, print NAS deploy commands
+release:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    hash=$(git rev-parse --short HEAD)
+    [ -n "$(git status --porcelain)" ] && echo "⚠ uncommitted changes — they WILL ship in this image"
+    # multi-arch manifest needs a docker-container builder; the classic docker driver can't export one
+    docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
+    echo "→ building {{server_image}} (amd64 + arm64) @ $hash"
+    docker buildx build --builder miu2d --platform linux/amd64,linux/arm64 \
+        --file packages/server/Dockerfile --target runner \
+        --tag {{server_image}}:$hash --tag {{server_image}}:latest \
+        --push .
+    echo "✓ pushed {{server_image}}:$hash (amd64 + arm64)"
+    echo ""
+    echo "── local (arm64): docker pull {{server_image}}:latest ──"
+    echo "── on NAS (192.168.1.63), in the miu2d compose dir ──"
+    echo "  sudo docker compose pull && sudo docker compose up -d"
+    echo "  sudo docker ps | grep miu2d-server        # Up, not Restarting"
+    echo "  curl -s -o /dev/null -w '%{http_code}\\n' http://localhost:8090/trpc/auth.me   # 200, not 502"
