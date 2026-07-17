@@ -166,21 +166,27 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
       return c.json({ error: "Invalid path" }, 403);
     }
 
-    // MSF/MPC 路径兼容：引擎期望 msf/map/... 但本地文件在 mpc/map/...
-    const needsMpcFallback =
-      relativePath.startsWith("msf/map/") && !fs.existsSync(localPath);
-    if (needsMpcFallback) {
-      const fallbackPath = "mpc" + relativePath.slice(3); // msf → mpc
-      localPath = path.join(gameResourceRoot, fallbackPath);
-    }
-
-    if (!fs.existsSync(localPath)) {
-      return c.json({ error: "File not found" }, 404);
+    // stat 兼作存在性检查并给出 size/mtime 供 etag; 一次 async stat 取代原来的
+    // existsSync×2 + statSync (每次同步调用都会阻塞事件循环, 跑图时并发几百 tile 会互卡)
+    let stat: fs.Stats;
+    try {
+      stat = await fs.promises.stat(localPath);
+    } catch {
+      // MSF/MPC 路径兼容：引擎期望 msf/map/... 但本地文件在 mpc/map/...
+      if (relativePath.startsWith("msf/map/")) {
+        localPath = path.join(gameResourceRoot, "mpc" + relativePath.slice(3));
+        try {
+          stat = await fs.promises.stat(localPath);
+        } catch {
+          return c.json({ error: "File not found" }, 404);
+        }
+      } else {
+        return c.json({ error: "File not found" }, 404);
+      }
     }
 
     // 磁盘回退也要支持协商缓存: 否则 dev 的 no-cache 下浏览器每次全量重下,
     // 跑图时 tile/精灵反复整包传输 (S3 路径有 ETag/304, 两路径行为须对称)
-    const stat = fs.statSync(localPath);
     const etag = `W/"${stat.size}-${Math.floor(stat.mtimeMs)}"`;
     if (c.req.header("if-none-match") === etag) {
       c.header("Cache-Control", CACHE_CONTROL);
@@ -193,42 +199,23 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
     c.header("ETag", etag);
     c.header("Content-Length", String(stat.size));
 
+    // 与 S3 分支对称走 hono stream(): await write 天然 backpressure (慢客户端不会把
+    // 整个文件积压进内存), onAbort 断连时销毁 fileStream 释放 fd。取代原先手写的
+    // wrapper——它无 backpressure, 且靠 closed 标志硬防 enqueue-after-close 崩进程
     const fileStream = fs.createReadStream(localPath);
-    return new Response(
-      new ReadableStream({
-        start(controller) {
-          // 客户端可能中途断开（切歌、SW 取消请求），此时 controller 已关闭，
-          // 但 fileStream 仍会 emit data → enqueue 抛 ERR_INVALID_STATE。
-          // 该异常发生在 stream event handler 中无人捕获，会直接 crash 整个进程。
-          // 用 closed 标志守护所有 controller 操作，避免对已关闭流操作。
-          let closed = false;
-          fileStream.on("data", (chunk: Buffer) => {
-            if (closed) return;
-            try {
-              controller.enqueue(chunk);
-            } catch {
-              // controller 已被下游关闭，停止读取并销毁文件流
-              closed = true;
-              fileStream.destroy();
-            }
-          });
-          fileStream.on("end", () => {
-            if (closed) return;
-            closed = true;
-            controller.close();
-          });
-          fileStream.on("error", (err) => {
-            if (closed) return;
-            closed = true;
-            controller.error(err);
-          });
-        },
-        // 客户端断开连接时触发：销毁文件流，释放 fd
-        cancel() {
-          fileStream.destroy();
-        },
-      }),
-    );
+    return stream(c, async (s) => {
+      s.onAbort(() => {
+        fileStream.destroy();
+      });
+      try {
+        for await (const chunk of fileStream) {
+          if (s.aborted) break;
+          await s.write(chunk as Uint8Array);
+        }
+      } catch {
+        // 客户端中途断开: fd 已由 onAbort 销毁, 静默收尾即可
+      }
+    });
   } catch (error) {
     logger.error("[getResource] Error:", error);
     return c.json({ error: "Internal server error" }, 500);
