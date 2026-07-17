@@ -37,8 +37,8 @@ COPY packages/server/tsconfig.json ./packages/server/
 COPY packages/server/tsconfig.build.json ./packages/server/
 COPY packages/server/rolldown.config.mjs ./packages/server/
 
-# 安装所有依赖（包括 devDependencies，构建时需要）
-RUN bun install --frozen-lockfile
+# 安装 server 依赖闭包（含 devDependencies，构建时需要）；--filter 避免装入 web 等无关包
+RUN bun install --frozen-lockfile --filter @miu2d/server --filter @miu2d/types --filter @miu2d/shared --filter miu2d
 
 # 复制源代码和脚本
 COPY packages/server/src ./packages/server/src
@@ -78,8 +78,8 @@ COPY --from=builder /app/packages/server/dist ./packages/server/dist
 # 复制 prisma schema 和迁移文件
 COPY --from=builder /app/packages/server/prisma ./packages/server/prisma
 
-# 只安装生产依赖
-RUN bun install --production --frozen-lockfile --ignore-scripts
+# 只安装 server 的生产依赖
+RUN bun install --production --frozen-lockfile --ignore-scripts --filter @miu2d/server --filter @miu2d/types --filter @miu2d/shared --filter miu2d
 
 # 设置工作目录
 WORKDIR /app/packages/server
