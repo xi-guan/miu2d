@@ -43,9 +43,11 @@ python3 scripts/sword1/harvest_names.py
 # 4. 转换 (ASF/MPC→MSF, MAP→MMF, GBK→UTF-8)
 ./packages/converter/target/release/convert-all resources/sword1
 
-# 5. 变体图目录别名 (见「踩过的坑」末条: -1 变体图的 tile 存在基础图目录下)
+# 5. tile 目录别名 (见「踩过的坑」末条: tile 目录名以 .map 头部内嵌路径为准)
 ln -s map113_五剑堂正厅 resources/sword1/mpc/map/map113_五剑堂正厅-1
 ln -s map120-1 resources/sword1/mpc/map/map120-1_风波亭
+ln -s map036_渔民家 resources/sword1/mpc/map/map036_渔夫家
+ln -s map077_岳飞主营帐 resources/sword1/mpc/map/map077_岳飞主帐营
 ```
 
 ## 名称恢复率
@@ -56,7 +58,7 @@ script   917/977   94%
 map      214/221   96%
 ini     1641/2015  81%
 sound    154/229   67%
-mpc     1361/1487  91%
+mpc     1368/1487  92%
 font       5/7
 img        0/8           ← 8 个 JPEG, 引用方未知
 ```
@@ -76,16 +78,12 @@ node scripts/check-game-refs.ts sword1   # 遍历每处引用, 按引擎规则�
 
 未命中的落 `_unnamed/<pak>/<hash>.<ext>`, 数据不丢, 只是路径不可被引用。
 
-tile 引用 1317 个, 尚缺 8 个 (0.6%), 涉 3 张图 — pak 里确实没有, 任何路径形状都不命中,
-原始数据即缺:
+tile 引用 1317 个, 尚缺 1 个 (map071_朱仙镇 的 200.mpc) — pak 里确实没有, 原始数据即缺。
 
-```
-map036_渔夫家 3    map071_朱仙镇 1    map077_岳飞主帐营 4
-```
-
-map113_五剑堂正厅-1 / map120-1_风波亭 曾各缺 10/6 个: blob 在基础图目录下
-(`mpc\map\map113_五剑堂正厅\` 与 `mpc\map\map120-1\`), 而引擎按 .map 名拼
-`msf/map/<图名>/` → 找不到。已用复现步骤第 5 步的目录别名解决 (2026-07-16)。
+map113/map120-1 (变体图) 与 map036_渔夫家/map077_岳飞主帐营 (整图全黑) 曾缺 10/6/3/4 个:
+tile 目录名与 .map 文件名不一致, 真实目录写在 .map 头部 (见「踩过的坑」末条),
+如 渔夫家→渔民家、主帐营→主营帐。已按头部路径补名解包, 并用复现步骤第 5 步的
+目录别名对齐引擎请求 (2026-07-16)。
 
 `brute-hash` 用于反推未知的路径形状 (已用它确定 tile 路径是 `mpc\map\<地图名>\<序号>.mpc`):
 
@@ -121,3 +119,8 @@ map113_五剑堂正厅-1 / map120-1_风波亭 曾各缺 10/6 个: blob 在基础
 - **`save/rpg0/` 出厂是空的**, 而 `NewGame.txt` 走 `LoadGame(0)`。初始存档在 `ini/save/`
   (game.ini / player0.ini / goods0.ini / Magic0.ini / traps.ini ...), 需按 yueying 的大小写
   拷进 `save/rpg0/`。
+- **tile 目录名以 .map 头部内嵌路径为准, 不是 .map 文件名**: 头部 0x20 处存 32 字节 GBK
+  字符串 `\mpc\map\<目录>`。脚本引用的图名与 tile 目录可以整个对不上 (渔夫家 vs 渔民家、
+  主帐营 vs 主营帐; 变体图的 -1 后缀差异也源于此), 差一个字全图黑。harvest 的
+  tile_names_from_maps() 已读该字段; 引擎仍按 .map 名拼路径, 不一致的图需目录别名
+  (复现步骤第 5 步)。

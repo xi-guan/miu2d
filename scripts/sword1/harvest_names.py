@@ -108,6 +108,11 @@ def tile_names_from_maps() -> set:
         # a few maps keep their tiles under a dir that is not the .map stem
         # (map120-1_风波亭 -> mpc\map\map120-1\); non-matching shapes are dropped by hash
         dirs = {stem, re.sub(r"-\d+$", "", stem), stem.split("_", 1)[0]}
+        # the authoritative tile dir is embedded in the header at 0x20 (\mpc\map\<dir>);
+        # it can differ from the .map filename entirely (map036_渔夫家 -> map036_渔民家)
+        hdr = data[0x20:0x40].split(b"\x00", 1)[0].decode("gbk", errors="ignore")
+        if hdr.lower().startswith("\\mpc\\map\\"):
+            dirs.add(hdr[9:])
         for k in range(255):
             off = 192 + k * 64
             raw = data[off : off + 32].split(b"\x00", 1)[0]

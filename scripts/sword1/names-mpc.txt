@@ -1359,3 +1359,10 @@ mpc\map\map121_洞庭湖底\zz-1.mpc
 mpc\map\map121_洞庭湖底\zz-2.mpc
 mpc\map\map121_洞庭湖底\zz-3.mpc
 mpc\map\map121_洞庭湖底\zz-4.mpc
+mpc\map\map036_渔民家\000.mpc
+mpc\map\map036_渔民家\z01.mpc
+mpc\map\map036_渔民家\z02.mpc
+mpc\map\map077_岳飞主营帐\000.mpc
+mpc\map\map077_岳飞主营帐\zz-1.mpc
+mpc\map\map077_岳飞主营帐\zz-2.mpc
+mpc\map\map077_岳飞主营帐\zz-3.mpc
