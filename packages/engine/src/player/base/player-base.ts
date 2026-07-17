@@ -22,6 +22,7 @@ import { findNpcAt } from "../../npc/npc-tile-queries";
 import { type AsfData, getCachedAsf } from "../../resource/format/asf";
 import { ResourcePath } from "../../resource/resource-paths";
 import type { InputState } from "../../runtime/input-types";
+import { distanceFromDelta, getDirectionFromVector } from "../../utils";
 import { PathType } from "../../utils/path-finder";
 import { clearDynamicObstacle, setDynamicObstacle } from "../../wasm/wasm-path-finder";
 import { GoodsListManager } from "../goods/goods-list-manager";
@@ -36,6 +37,11 @@ export const THEW_USE_AMOUNT_WHEN_JUMP = 10;
 export const IS_USE_THEW_WHEN_NORMAL_RUN = false;
 // Mana restore interval when sitting (ms)
 export const SITTING_MANA_RESTORE_INTERVAL = 150;
+
+// 按住鼠标超过该时长 = 转向驾驶模式（每帧朝光标方向走，不寻路）；以内 = 单击寻路
+const MOUSE_STEER_HOLD_MS = 200;
+// 光标离角色不足一格（相邻瓦片中心最近约 36px）时不再发移动指令
+const MOUSE_STEER_MIN_DIST_PX = 24;
 
 // Restore percentages from Player.cs
 export const LIFE_RESTORE_PERCENT = 0.002;
@@ -447,6 +453,12 @@ export abstract class PlayerBase extends Character {
   handleInput(input: InputState, _cameraX: number, _cameraY: number): PlayerAction | null {
     this._pendingAction = null;
 
+    if (!input.isMouseDown) {
+      this._mouseDownAtMs = null;
+    } else if (this._mouseDownAtMs === null) {
+      this._mouseDownAtMs = performance.now();
+    }
+
     if (!this.canPerformAction()) {
       return null;
     }
@@ -467,6 +479,21 @@ export abstract class PlayerBase extends Character {
     }
 
     if (input.isMouseDown && input.clickedTile) {
+      // 转向驾驶模式：连续跟随光标是控制问题而非规划问题，反复重规划是拐角抖动根源。
+      // 每帧朝光标方向走一步（同摇杆/键盘，moveInDirection 自带 ±1 方向滑墙）
+      if (
+        this._mouseDownAtMs !== null &&
+        performance.now() - this._mouseDownAtMs > MOUSE_STEER_HOLD_MS
+      ) {
+        const dx = input.mouseWorldX - this._positionInWorld.x;
+        const dy = input.mouseWorldY - this._positionInWorld.y;
+        if (distanceFromDelta(dx, dy) >= MOUSE_STEER_MIN_DIST_PX) {
+          this.cancelAutoAttack();
+          this.moveInDirection(getDirectionFromVector({ x: dx, y: dy }) as Direction, this._isRun);
+        }
+        return null;
+      }
+
       const targetTile = input.clickedTile;
       const destMatch =
         this._destinationMoveTilePosition &&
@@ -577,6 +604,8 @@ export abstract class PlayerBase extends Character {
   /**
    * Move in a direction
    */
+  private _mouseDownAtMs: number | null = null;
+
   protected moveInDirection(direction: Direction, isRun: boolean = false): void {
     const primaryDir = direction as number;
     const directionOrder = [primaryDir, (primaryDir + 1) % 8, (primaryDir + 7) % 8];
@@ -585,13 +614,19 @@ export abstract class PlayerBase extends Character {
     const mapService = this.engine.map;
 
     for (const dirIndex of directionOrder) {
-      const targetTile = neighbors[dirIndex];
+      let targetTile = neighbors[dirIndex];
       const isObstacle = mapService.isObstacleForCharacter(targetTile.x, targetTile.y);
       if (isObstacle) {
         continue;
       }
 
       this._currentDirection = dirIndex as Direction;
+
+      // 视界延到 2 格：1 格指令常在一帧内走完 → 路径耗尽站立 1 帧 → 跑动卡顿
+      const twoAhead = this.findAllNeighbors(targetTile)[dirIndex];
+      if (!mapService.isObstacleForCharacter(twoAhead.x, twoAhead.y)) {
+        targetTile = twoAhead;
+      }
 
       const success =
         isRun && this.canRunCheck() ? this.runTo(targetTile) : this.walkTo(targetTile);
