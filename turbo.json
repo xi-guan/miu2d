@@ -1,5 +1,6 @@
 {
   "$schema": "https://turborepo.com/schema.json",
+  "globalDependencies": ["tsconfig.base.json", "packages/engine-wasm/pkg/**"],
   "tasks": {
     "dev": {
       "cache": false,
@@ -19,11 +20,9 @@
     },
     "tsc": {
       "dependsOn": ["^tsc"],
-      "cache": false
+      "outputs": ["**/*.tsbuildinfo"]
     },
-    "test": {
-      "cache": false
-    },
+    "test": {},
     "lint": {
       "dependsOn": ["^lint"],
       "cache": false

@@ -27,23 +27,44 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      # wasm 产物按源文件 hash 缓存；命中则整条 rust 链（toolchain/wasm-pack/编译）全部跳过
+      - uses: actions/cache@v4
+        id: wasm-cache
+        with:
+          path: packages/engine-wasm/pkg
+          key: wasm-${{ runner.os }}-${{ hashFiles('packages/engine-wasm/src/**', 'packages/engine-wasm/Cargo.toml', 'packages/engine-wasm/Cargo.lock', 'scripts/build-wasm.sh') }}
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.wasm-cache.outputs.cache-hit != 'true'
         with:
           targets: wasm32-unknown-unknown
       - uses: taiki-e/install-action@v2
+        if: steps.wasm-cache.outputs.cache-hit != 'true'
         with:
           tool: wasm-pack
       - uses: Swatinem/rust-cache@v2
+        if: steps.wasm-cache.outputs.cache-hit != 'true'
         with:
           workspaces: packages/engine-wasm
+      # turbo 本地缓存跨 run 复用；key 永不精确命中(github.sha)，靠 restore-keys 取最近的
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
       - run: bun install --frozen-lockfile
       - run: bun run build:wasm
+        if: steps.wasm-cache.outputs.cache-hit != 'true'
       - run: bun run --filter=@miu2d/types build
       - run: bun run --filter=@miu2d/server db:generate
       - run: bun run --filter=@miu2d/server gen:trpc
       - run: bun run tsc
       - run: bun run lint
-      - run: bun run --filter=@miu2d/engine test
+      - run: bunx turbo run test --filter=@miu2d/engine
 
   converter:
     name: cargo check (converter)
