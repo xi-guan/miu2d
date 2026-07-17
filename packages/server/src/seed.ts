@@ -1,4 +1,3 @@
-import "dotenv/config";
 
 import { db } from "./db/client";
 import { hashPassword } from "./utils/password";

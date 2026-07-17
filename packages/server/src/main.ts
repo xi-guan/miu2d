@@ -1,7 +1,5 @@
 import "reflect-metadata";
-import "dotenv/config";
 
-import { serve } from "@hono/node-server";
 import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -103,11 +101,5 @@ app.use("/trpc/*", async (c, next) => {
 
 app.use("/trpc/*", trpcServer({ router: appRouter, createContext }));
 
-async function bootstrap() {
-  const port = env.port;
-  serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
-    console.log(`Application is running on: http://0.0.0.0:${port}`);
-  });
-}
-
-bootstrap();
+Bun.serve({ fetch: app.fetch, port: env.port, hostname: "0.0.0.0" });
+console.log(`Application is running on: http://0.0.0.0:${env.port}`);

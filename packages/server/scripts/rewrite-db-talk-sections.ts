@@ -9,7 +9,7 @@
  * idempotent: a talk() already numeric is left untouched. commented calls
  * (-- before talk on the same line) are skipped.
  *
- * usage:  tsx --tsconfig tsconfig.dev.json scripts/rewrite-db-talk-sections.ts [--apply]
+ * usage:  bun scripts/rewrite-db-talk-sections.ts [--apply]
  * without --apply it is a dry-run (reports counts, writes nothing).
  */
 import { readFileSync } from "node:fs";
