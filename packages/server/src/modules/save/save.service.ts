@@ -11,7 +11,7 @@ import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
 import type { Prisma, Save as PrismaSave } from "../../db/generated/prisma/client";
 import { env } from "../../env";
-import { deleteFile, getDownloadUrl, uploadFile } from "../../storage/s3";
+import { deleteFile, downloadFile, uploadFile } from "../../storage/s3";
 import { verifyGameOwnerAccess } from "../../utils/gameAccess";
 import { Logger } from "../../utils/logger.js";
 
@@ -491,15 +491,17 @@ export class SaveService {
 
   private async toOutput(row: Omit<PrismaSave, "data">) {
     // screenshot 可能是旧的 base64 data URI、S3 key（私有 bucket），或磁盘回退的 local: key。
-    // S3 key 需签名为临时可访问 URL，local: key 读回为 data URI，前端才能直接用作 <img src>。
+    // 一律读回为 data URI 供前端 <img src>：S3 key 服务端下载转码，local: key 从磁盘读。
+    // 不发 presigned URL——其 host 是内部 endpoint 浏览器解析不了，且 nginx /s3 rewrite 会破坏签名。
     let screenshot = row.screenshot ?? undefined;
     if (screenshot && isLocalKey(screenshot)) {
       screenshot = await readLocalScreenshot(screenshot);
     } else if (screenshot && !isBase64DataUri(screenshot)) {
       try {
-        screenshot = await getDownloadUrl(screenshot);
+        const buffer = await downloadFile(screenshot);
+        screenshot = `data:image/jpeg;base64,${buffer.toString("base64")}`;
       } catch (e) {
-        logger.error("[SaveService] Failed to sign screenshot URL:", e);
+        logger.error("[SaveService] Failed to load screenshot from S3:", e);
         screenshot = undefined;
       }
     }
