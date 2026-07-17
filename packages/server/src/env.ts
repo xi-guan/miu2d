@@ -55,6 +55,8 @@ export const env = {
   s3PublicEndpoint: str("S3_PUBLIC_ENDPOINT", "/s3"),
   /** S3 不可用时存档截图的磁盘回退目录（相对 cwd，即 packages/server） */
   saveScreenshotDir: str("SAVE_SCREENSHOT_DIR", "../../.data/save-screenshots"),
+  /** 磁盘资源根目录（相对 cwd）；docker 把 resources 挂到 ../../resources = /app/resources */
+  resourceRoot: str("RESOURCE_ROOT", "../../resources"),
 
   // ---------- Email / SMTP ----------
   smtpHost: str("SMTP_HOST"),

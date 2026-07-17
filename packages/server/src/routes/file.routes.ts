@@ -7,8 +7,6 @@
  * 开发模式回退：MinIO 无文件时从本地 resources/ 目录读取
  */
 
-import { fileURLToPath } from "node:url";
-
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import * as fs from "node:fs";
@@ -19,11 +17,10 @@ import * as s3 from "../storage/s3";
 import { resolveFilePath } from "../utils/file";
 import { Logger } from "../utils/logger";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const logger = new Logger("FileRoutes");
-const RESOURCE_ROOT = path.resolve(__dirname, "../../../..", "resources");
+// resolve from cwd (packages/server in dev, /app/packages/server in docker), NOT __dirname:
+// the rolldown bundle sits a dir shallower than src, so __dirname-relative paths drift and 404
+const RESOURCE_ROOT = path.resolve(env.resourceRoot);
 
 // dev keeps no-cache so re-converted local assets show up immediately; prod assets change only via re-import
 const CACHE_CONTROL = env.isProd ? `public, max-age=${env.assetCacheMaxAge}` : "no-cache";
