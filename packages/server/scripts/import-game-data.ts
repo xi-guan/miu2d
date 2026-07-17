@@ -6,8 +6,8 @@
  * batchImportFromIni / importScene / ... 写库。
  *
  * 用法:
- *   bun scripts/import-game-data.ts <slug> [--no-clear]
- *   bun scripts/import-game-data.ts <slug> --only npc,magic
+ *   tsx --tsconfig tsconfig.dev.json scripts/import-game-data.ts <slug> [--no-clear]
+ *   tsx --tsconfig tsconfig.dev.json scripts/import-game-data.ts <slug> --only npc,magic
  *
  * 背景: sword2 等剑侠系 ini 的 section/key 为全小写(name=/[init]/...)，而各 service 的
  * parser 多为 PascalCase 大小写敏感(case "Name" / === "Init")。导入前用 canonical-keys.json

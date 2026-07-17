@@ -1,18 +1,19 @@
+import bcrypt from "bcryptjs";
+
 const SALT_ROUNDS = 12;
 
 /**
- * Hash a plaintext password with bcrypt (Bun native).
+ * Hash a plaintext password with bcrypt.
  */
 export async function hashPassword(password: string): Promise<string> {
-  return Bun.password.hash(password, { algorithm: "bcrypt", cost: SALT_ROUNDS });
+  return bcrypt.hash(password, SALT_ROUNDS);
 }
 
 /**
  * Compare a plaintext password against a stored bcrypt hash.
- * >72 字节密码 node bcrypt 截断而 Bun 先 SHA-512 预哈希, 结果不同; 存量 hash 已实测双向兼容
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return Bun.password.verify(password, hash);
+  return bcrypt.compare(password, hash);
 }
 
 /**

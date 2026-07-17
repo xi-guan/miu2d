@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@miu2d/types": ["../types/src/index.ts"],
+      "@miu2d/shared/locales": ["../shared/src/locales/index.ts"],
+      "@/*": ["./src/*"]
+    }
+  }
+}
