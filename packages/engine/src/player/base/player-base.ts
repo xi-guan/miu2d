@@ -490,6 +490,9 @@ export abstract class PlayerBase extends Character {
         if (distanceFromDelta(dx, dy) >= MOUSE_STEER_MIN_DIST_PX) {
           this.cancelAutoAttack();
           this.moveInDirection(getDirectionFromVector({ x: dx, y: dy }) as Direction, this._isRun);
+        } else if (this.isWalking() || this.isRunning()) {
+          // 光标贴身时收敛到光标瓦片停下；否则沿旧的 2 格指令冲过光标再绕回
+          this._destinationMoveTilePosition = { ...input.clickedTile };
         }
         return null;
       }

@@ -376,6 +376,17 @@ export abstract class CharacterMovement extends CharacterBase {
     return this._activePathType === PathType.End ? this.getPathType() : this._activePathType;
   }
 
+  /**
+   * 拐角抖动只来自 ±45° 等价路线的 tie-break 交替，所以仅小角度转向延迟到路点提交；
+   * ≥90° 急转是明确的用户意图，立即重寻路，否则转向滞后一整格、跑动不跟鼠标
+   */
+  private _isSmallHeadingChange(destTile: Vector2): boolean {
+    const destPixel = tileToPixel(destTile.x, destTile.y);
+    const newDir = getDirection(this._positionInWorld, destPixel) as number;
+    const delta = Math.abs(newDir - (this._currentDirection as number));
+    return Math.min(delta, 8 - delta) <= 1;
+  }
+
   private _repathAtWaypointIfDestChanged(): void {
     const dest = this._destinationMoveTilePosition;
     // {0,0} 是"无目标"哨兵（同 C# Vector2.Zero）
@@ -446,11 +457,12 @@ export abstract class CharacterMovement extends CharacterBase {
 
     // C# WalkTo：行走中只更新目标，moveAlongPath 在下个路点提交转向
     // 段中立即重寻路会导致拐角处首步左右交替 → 剧烈抖动
-    // 显式传入不同 pathType 时（如手动/脚本切换）落到下方全量重寻路
+    // 显式传入不同 pathType 时（如手动/脚本切换）或急转弯时落到下方全量重寻路
     if (
       this.isWalking() &&
       !this._isInStepMove &&
-      (pathTypeOverride === PathType.End || pathTypeOverride === this._activePathType)
+      (pathTypeOverride === PathType.End || pathTypeOverride === this._activePathType) &&
+      this._isSmallHeadingChange(destTile)
     ) {
       this.cancelAttackTarget();
       this._destinationMoveTilePosition = { ...destTile };
@@ -483,10 +495,11 @@ export abstract class CharacterMovement extends CharacterBase {
       return false;
     }
 
-    // C# RunTo：跑动中只更新目标，同 walkTo，转向在瓦片中心提交
+    // C# RunTo：跑动中只更新目标，同 walkTo，转向在瓦片中心提交（急转弯立即重寻路）
     if (
       this.isRunning() &&
-      (pathTypeOverride === PathType.End || pathTypeOverride === this._activePathType)
+      (pathTypeOverride === PathType.End || pathTypeOverride === this._activePathType) &&
+      this._isSmallHeadingChange(destTile)
     ) {
       this._destinationMoveTilePosition = { ...destTile };
       return true;
