@@ -306,7 +306,7 @@ export class Npc extends Character {
    *
    * 当 NPC 已经在走路时：
    * - 目标 tile 未变：跳过，不重算路径
-   * - 目标 tile 变了（玩家移动）：交给基类存新目标，下个路点提交转向
+   * - 目标 tile 变了（玩家移动）：立即重算路径追击
    */
   override walkTo(
     destTile: Vector2,

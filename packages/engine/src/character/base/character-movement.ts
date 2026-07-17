@@ -42,9 +42,6 @@ const DIRECTION_WALK_LOOK_AHEAD_TILES = 1;
  * 包含：寻路、移动、跳跃、贝塞尔曲线移动、被武功拖动等
  */
 export abstract class CharacterMovement extends CharacterBase {
-  /** 当前路径所用的寻路类型；路点/障碍重寻路沿用它（End = 未移动过，取 getPathType()） */
-  protected _activePathType: PathType = PathType.End;
-
   // =============================================
   // === Movement Core Methods ===
   // =============================================
@@ -227,7 +224,7 @@ export abstract class CharacterMovement extends CharacterBase {
           const newPath = this._dispatchFindPath(
             tileFrom,
             this._destinationMoveTilePosition,
-            this._resolveActivePathType(),
+            this.getPathType(),
             8
           );
 
@@ -266,7 +263,6 @@ export abstract class CharacterMovement extends CharacterBase {
         this.movedDistance = 0;
         this.path.shift();
         result.moved = true;
-        this._repathAtWaypointIfDestChanged();
 
         if (this.path.length === 0) {
           // 到达最终目的地
@@ -300,7 +296,6 @@ export abstract class CharacterMovement extends CharacterBase {
         this.movedDistance = 0;
         this.path.shift();
         result.moved = true;
-        this._repathAtWaypointIfDestChanged();
 
         // 设置朝向
         this._currentDirection = getDirection({ x: 0, y: 0 }, { x: dx, y: dy });
@@ -367,42 +362,6 @@ export abstract class CharacterMovement extends CharacterBase {
   }
 
   /**
-   * walkTo/runTo 在移动中只更新 _destinationMoveTilePosition（见其注释），
-   * 这里在到达路点（瓦片中心）时检查目标是否变化并提交重寻路。
-   * C# 参考：MoveAlongPath 中 DestinationMovePositionInWorld != Path.Last.Value 分支
-   */
-  /** 重寻路沿用当前路径的类型（手动=贪心、脚本=A*），未移动过则回退 getPathType() */
-  private _resolveActivePathType(): PathType {
-    return this._activePathType === PathType.End ? this.getPathType() : this._activePathType;
-  }
-
-  private _repathAtWaypointIfDestChanged(): void {
-    const dest = this._destinationMoveTilePosition;
-    // {0,0} 是"无目标"哨兵（同 C# Vector2.Zero）
-    if (dest.x === 0 && dest.y === 0) return;
-    const tail = this.path[this.path.length - 1];
-    if (tail && tail.x === dest.x && tail.y === dest.y) return;
-    if (this._mapX === dest.x && this._mapY === dest.y) {
-      this.path = [];
-      return;
-    }
-    // 滞后重寻路：目标仍在旧路径终点 2 格内时沿旧路径继续走，吸收相机跟随导致的
-    // 目标瓦片漂移；否则每路点重算一次，A* 等价路线 tie-break 交替 → 拐角左右抖动
-    if (tail && this.path.length > 2 && getViewTileDistance(tail, dest) <= 2) return;
-    const newPath = this._dispatchFindPath(
-      { x: this._mapX, y: this._mapY },
-      dest,
-      this._resolveActivePathType(),
-      8
-    );
-    // 寻路失败（目标不可达/在障碍上）时沿旧路径走完，避免中途站住抖动；
-    // 走完后 handleInput 的 directionWalk 回退会接手
-    if (newPath.length > 0) {
-      this.path = newPath.slice(1);
-    }
-  }
-
-  /**
    * 到达路点后发现下一瓦片有障碍物时的处理
    */
   private _handleObstacleOnNextTile(nextTile: Vector2): void {
@@ -411,7 +370,7 @@ export abstract class CharacterMovement extends CharacterBase {
       const newPath = this._dispatchFindPath(
         { x: this._mapX, y: this._mapY },
         this._destinationMoveTilePosition,
-        this._resolveActivePathType(),
+        this.getPathType(),
         8
       );
 
@@ -444,19 +403,6 @@ export abstract class CharacterMovement extends CharacterBase {
     if (!this.performActionOk()) return false;
     if (this._mapX === destTile.x && this._mapY === destTile.y) return true;
 
-    // C# WalkTo：行走中只更新目标，moveAlongPath 在下个路点提交转向
-    // 段中立即重寻路会导致拐角处首步左右交替 → 剧烈抖动
-    // 显式传入不同 pathType 时（如手动/脚本切换）落到下方全量重寻路
-    if (
-      this.isWalking() &&
-      !this._isInStepMove &&
-      (pathTypeOverride === PathType.End || pathTypeOverride === this._activePathType)
-    ) {
-      this.cancelAttackTarget();
-      this._destinationMoveTilePosition = { ...destTile };
-      return true;
-    }
-
     const result = this._findPathAndMove(destTile, pathTypeOverride, skipDirectionFallback);
     if (!result) return false;
 
@@ -481,15 +427,6 @@ export abstract class CharacterMovement extends CharacterBase {
     if (this._mapX === destTile.x && this._mapY === destTile.y) return true;
     if (!this.isStateImageOk(CharacterState.Run) && !this.isStateImageOk(CharacterState.FightRun)) {
       return false;
-    }
-
-    // C# RunTo：跑动中只更新目标，同 walkTo，转向在瓦片中心提交
-    if (
-      this.isRunning() &&
-      (pathTypeOverride === PathType.End || pathTypeOverride === this._activePathType)
-    ) {
-      this._destinationMoveTilePosition = { ...destTile };
-      return true;
     }
 
     const result = this._findPathAndMove(destTile, pathTypeOverride, skipDirectionFallback);
@@ -525,7 +462,6 @@ export abstract class CharacterMovement extends CharacterBase {
     skipDirectionFallback = false
   ): boolean {
     const usePathType = pathTypeOverride === PathType.End ? this.getPathType() : pathTypeOverride;
-    this._activePathType = usePathType;
 
     const startTile = { x: this._mapX, y: this._mapY };
     let actualDestTile = destTile;
