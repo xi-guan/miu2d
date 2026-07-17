@@ -139,7 +139,10 @@ release:
     # multi-arch manifest needs a docker-container builder; the classic docker driver can't export one
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
     echo "→ building {{server_image}} (amd64 + arm64) @ $hash"
-    docker buildx build --builder miu2d --platform linux/amd64,linux/arm64 \
+    # --no-cache: a warm cache twice produced a broken image (poisoned bundle, then
+    # rolldown mis-resolving @miu2d/types → shared/locales). the workspace-symlink
+    # resolution is cache-sensitive; a clean build is the only reliably-correct one
+    docker buildx build --builder miu2d --no-cache --platform linux/amd64,linux/arm64 \
         --file packages/server/Dockerfile --target runner \
         --tag {{server_image}}:$hash --tag {{server_image}}:latest \
         --push .
