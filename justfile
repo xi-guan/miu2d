@@ -11,11 +11,11 @@ setup:
     [ -f .env ] || cp .env.example .env
     [ -f packages/server/.env ] || cp packages/server/.env.example packages/server/.env
     echo "→ installing node dependencies"
-    pnpm install
+    bun install
     echo "→ generating prisma client"
-    pnpm --filter @miu2d/server db:generate
+    bun run --filter=@miu2d/server db:generate
     echo "→ building shared types"
-    pnpm --filter @miu2d/types build
+    bun run --filter=@miu2d/types build
     echo "✓ setup complete"
 
 # start db + rustfs containers
@@ -43,7 +43,7 @@ _db-migrate:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ running migrations"
-    pnpm --filter @miu2d/server db:migrate
+    bun run --filter=@miu2d/server db:migrate
     echo "✓ migrations applied"
 
 [private]
@@ -51,7 +51,7 @@ _db-migrate-dev:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ running dev migrations (prisma migrate dev)"
-    pnpm --filter @miu2d/server db:migrate:dev
+    bun run --filter=@miu2d/server db:migrate:dev
     echo "✓ done"
 
 [private]
@@ -59,24 +59,24 @@ _db-seed:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ seeding database"
-    pnpm --filter @miu2d/server db:seed
+    bun run --filter=@miu2d/server db:seed
     echo "✓ seed complete"
 
 [private]
 _db-studio:
-    pnpm --filter @miu2d/server db:studio
+    bun run --filter=@miu2d/server db:studio
 
 [private]
 _db-generate:
-    pnpm --filter @miu2d/server db:generate
+    bun run --filter=@miu2d/server db:generate
 
 # start full dev stack (web :5274 + server :4100)
 dev: (db "up")
-    pnpm dev
+    bun run dev
 
 # start server only
 dev-server: (db "up")
-    pnpm dev:server
+    bun run dev:server
 
 # build production web bundle
 build:
@@ -88,11 +88,10 @@ build:
         echo "→ $label"
         "$@" >"$log" 2>&1 || { local rc=$?; echo "✗ $label failed:" >&2; cat "$log" >&2; exit $rc; }
     }
-    run_quiet "building shared types"  pnpm --filter @miu2d/types build
-    run_quiet "generating prisma client" pnpm --filter @miu2d/server db:generate
-    run_quiet "generating trpc types"  pnpm --filter @miu2d/server gen:trpc
-    run_quiet "building engine"        pnpm --filter @miu2d/engine build
-    run_quiet "building web"           pnpm --filter @miu2d/web build
+    run_quiet "building shared types"  bun run --filter=@miu2d/types build
+    run_quiet "generating prisma client" bun run --filter=@miu2d/server db:generate
+    run_quiet "generating trpc types"  bun run --filter=@miu2d/server gen:trpc
+    run_quiet "building web"           bun run --filter=@miu2d/web build
     echo "✓ build complete"
 
 # build rust converter binaries
@@ -108,7 +107,7 @@ build-converter:
 
 # run biome lint + format check
 lint:
-    pnpm check
+    bun run check
     bash packages/server/scripts/check-router-providers.sh
 
 # convert all game resources (encoding + asf + mpc + map + video), deletes originals
