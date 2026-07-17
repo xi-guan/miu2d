@@ -6,7 +6,7 @@
  * golden 变化 = converter 输出或解码行为变化, 必须人工确认后更新基线。
  *
  * 资源不入 git: 本地无 resources/ 时整组 skip。
- * 更新基线: GOLDEN_UPDATE=1 pnpm vitest run tests/resource/msf-golden.test.ts
+ * 更新基线: GOLDEN_UPDATE=1 bunx vitest run tests/resource/msf-golden.test.ts
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

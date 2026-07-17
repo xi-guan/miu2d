@@ -1,6 +1,6 @@
 # Miu2D Engine
 
-TypeScript + React 19 + WebGL，复刻《剑侠情缘外传：月影传说》。pnpm monorepo，Hono + tRPC 后端，PostgreSQL + MinIO 存储。前端 `5274`，后端 `4000`。不要直接启动前后端，用 curl 测试，自动热更新。
+TypeScript + React 19 + WebGL，复刻《剑侠情缘外传：月影传说》。bun workspaces monorepo，Hono + tRPC 后端，PostgreSQL + MinIO 存储。前端 `5274`，后端 `4000`。不要直接启动前后端，用 curl 测试，自动热更新。
 
 ## 架构分层
 
@@ -41,6 +41,6 @@ docker exec apps-postgres psql -U postgres -d apps_db -c "<SQL>"
 ## CI 命令
 
 ```bash
-pnpm tsc     # 类型检查（修改后必须通过）
+bun run tsc     # 类型检查（修改后必须通过）
 just lint    # Biome lint（修改后必须通过）
 ```

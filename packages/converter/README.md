@@ -34,32 +34,32 @@ just convert
 just convert-verify
 ```
 
-### 通过 pnpm
+### 通过 bun
 
 ```bash
 cd packages/converter
 
 # 转换到单独输出目录
-pnpm convert:asf
+bun run convert:asf
 # → resources/asf → resources/asf_msf
 
 # 转换 + 部署（回写 .msf 到 resources/asf/ 并清理）
-pnpm convert:asf:deploy
+bun run convert:asf:deploy
 
 # MPC 转换到单独输出目录
-pnpm convert:mpc
+bun run convert:mpc
 
 # MPC 转换 + 部署（回写 .msf 到 resources/mpc/ 并清理）
-pnpm convert:mpc:deploy
+bun run convert:mpc:deploy
 
 # MAP 转 MMF
-pnpm convert:map
+bun run convert:map
 
 # 逐像素验证（对比同目录下的 .asf 和 .msf 文件）
-pnpm verify
+bun run verify
 
 # 扫描 ASF 文件的半透明 alpha 使用情况
-pnpm scan-alpha
+bun run scan-alpha
 ```
 
 ### 通过 cargo
@@ -159,7 +159,7 @@ MPC 文件                          MSF 文件
 ```
 packages/converter/
 ├── Cargo.toml          # Rust 依赖 (walkdir, rayon, zstd, encoding_rs)
-├── package.json        # pnpm 脚本
+├── package.json        # bun 脚本
 ├── README.md
 └── src/
     ├── main.rs         # asf2msf 主转换器

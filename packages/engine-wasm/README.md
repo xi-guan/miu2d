@@ -136,10 +136,10 @@ cargo install wasm-pack
 rustup target add wasm32-unknown-unknown
 
 # 构建命令
-pnpm build            # 开发构建（含 debug 日志）
-pnpm build:release    # 生产构建（日志移除，wasm-opt 优化）
-pnpm test             # 运行 Rust 测试（29 个用例）
-pnpm clean            # 清理构建产物
+bun run build            # 开发构建（含 debug 日志）
+bun run build:release    # 生产构建（日志移除，wasm-opt 优化）
+bun run test             # 运行 Rust 测试（29 个用例）
+bun run clean            # 清理构建产物
 ```
 
 ## 目录结构

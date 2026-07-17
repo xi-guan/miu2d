@@ -5,9 +5,9 @@
  * 将 ui_settings.ini 文件转换为 UiTheme JSON 格式。
  *
  * 用法:
- *   pnpm tsx scripts/convert-ini-to-theme.ts <ini_file> [output_file]
- *   pnpm tsx scripts/convert-ini-to-theme.ts ui_demo/月影传说.ini ui_demo/月影传说.json
- *   pnpm tsx scripts/convert-ini-to-theme.ts --all   # 批量转换 ui_demo/ 下所有 .ini
+ *   bunx tsx scripts/convert-ini-to-theme.ts <ini_file> [output_file]
+ *   bunx tsx scripts/convert-ini-to-theme.ts ui_demo/月影传说.ini ui_demo/月影传说.json
+ *   bunx tsx scripts/convert-ini-to-theme.ts --all   # 批量转换 ui_demo/ 下所有 .ini
  *
  * 如果不指定 output_file，默认输出到同目录同名 .json 文件。
  */
@@ -60,8 +60,8 @@ function main(): void {
 
   if (args.length === 0) {
     console.log("Usage:");
-    console.log("  pnpm tsx scripts/convert-ini-to-theme.ts <ini_file> [output_file]");
-    console.log("  pnpm tsx scripts/convert-ini-to-theme.ts --all");
+    console.log("  bunx tsx scripts/convert-ini-to-theme.ts <ini_file> [output_file]");
+    console.log("  bunx tsx scripts/convert-ini-to-theme.ts --all");
     console.log("");
     console.log("Options:");
     console.log("  --all    Convert all .ini files in ui_demo/ directory");

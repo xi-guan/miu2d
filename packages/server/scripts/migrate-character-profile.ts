@@ -9,8 +9,8 @@
  * 已包含 characterProfiles 的存档会被跳过。
  *
  * 用法：
- *   预览（默认）: cd packages/server && pnpm tsx scripts/migrate-character-profile.ts
- *   实际写入   : cd packages/server && pnpm tsx scripts/migrate-character-profile.ts --apply
+ *   预览（默认）: cd packages/server && bunx tsx scripts/migrate-character-profile.ts
+ *   实际写入   : cd packages/server && bunx tsx scripts/migrate-character-profile.ts --apply
  */
 
 import path from "node:path";

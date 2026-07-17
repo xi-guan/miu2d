@@ -3,7 +3,7 @@
  * 转换为新格式（magicContainer/goodsContainer）
  *
  * 用法：
- *   cd packages/server && pnpm tsx ../../scripts/archive/migrate-saves-magic-container.ts
+ *   cd packages/server && bunx tsx ../../scripts/archive/migrate-saves-magic-container.ts
  */
 
 import path from "node:path";
