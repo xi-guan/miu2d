@@ -178,8 +178,20 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
       return c.json({ error: "File not found" }, 404);
     }
 
+    // 磁盘回退也要支持协商缓存: 否则 dev 的 no-cache 下浏览器每次全量重下,
+    // 跑图时 tile/精灵反复整包传输 (S3 路径有 ETag/304, 两路径行为须对称)
+    const stat = fs.statSync(localPath);
+    const etag = `W/"${stat.size}-${Math.floor(stat.mtimeMs)}"`;
+    if (c.req.header("if-none-match") === etag) {
+      c.header("Cache-Control", CACHE_CONTROL);
+      c.header("ETag", etag);
+      return c.body(null, 304);
+    }
+
     c.header("Content-Type", detectMimeType(localPath) || "application/octet-stream");
     c.header("Cache-Control", CACHE_CONTROL);
+    c.header("ETag", etag);
+    c.header("Content-Length", String(stat.size));
 
     const fileStream = fs.createReadStream(localPath);
     return new Response(
