@@ -134,7 +134,8 @@ release:
     #!/usr/bin/env bash
     set -euo pipefail
     hash=$(git rev-parse --short HEAD)
-    [ -n "$(git status --porcelain)" ] && echo "⚠ uncommitted changes — they WILL ship in this image"
+    # dirty builds once poisoned the buildx cache with a broken bundle layer — refuse outright
+    [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
     # multi-arch manifest needs a docker-container builder; the classic docker driver can't export one
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
     echo "→ building {{server_image}} (amd64 + arm64) @ $hash"

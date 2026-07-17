@@ -23,6 +23,11 @@ export default {
       !id.startsWith("/") &&
       !id.startsWith("@/") &&
       !id.startsWith("@miu2d/")),
+  // an unresolved @miu2d import once shipped silently as external and crashed prod — fail loudly
+  onwarn(warning, warn) {
+    if (warning.code === "UNRESOLVED_IMPORT") throw new Error(warning.message);
+    warn(warning);
+  },
   // JSON is handled natively by rolldown — @rollup/plugin-json no longer needed
   plugins: [
     // 解析 @miu2d/* 工作区包，从其 src 直接打包
