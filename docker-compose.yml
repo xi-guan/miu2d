@@ -57,6 +57,9 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-miu2d}
     ports:
       - "4100:4000"
+    volumes:
+      # sword1/sword2 走磁盘回退 (yueying 走 RustFS); RESOURCE_ROOT 在容器内解析到 /app/resources
+      - ./resources:/app/resources:ro
     depends_on:
       db:
         condition: service_healthy
