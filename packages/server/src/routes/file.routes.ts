@@ -4,7 +4,7 @@
  * 提供 /game/:gameSlug/resources/* 路径的公开访问
  * 用于游戏客户端直接加载资源文件
  *
- * 开发模式回退：MinIO 无文件时从本地 resources/ 目录读取
+ * 磁盘回退：DB 无文件记录、或 S3 取用失败时，从本地 resources/ 目录读取
  */
 
 import { Hono } from "hono";
@@ -122,39 +122,50 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
         return c.json({ error: "Path is not a file" }, 400);
       }
 
-      // 3. 从 S3 获取文件流
-      const ifNoneMatch = c.req.header("if-none-match");
-      const {
-        stream: fileStream,
-        contentType,
-        contentLength,
-        etag,
-        notModified,
-      } = await s3.getFileStream(file.storageKey, ifNoneMatch);
+      // 3. 从 S3 获取文件流。失败不直接 500——S3 整个挂掉时曾让 yueying 全线黑屏，
+      //    而磁盘上通常有同一份素材，降级读盘远好过不可用
+      try {
+        const ifNoneMatch = c.req.header("if-none-match");
+        const {
+          stream: fileStream,
+          contentType,
+          contentLength,
+          etag,
+          notModified,
+        } = await s3.getFileStream(file.storageKey, ifNoneMatch);
 
-      if (notModified) {
+        if (notModified) {
+          c.header("Cache-Control", CACHE_CONTROL);
+          if (etag) c.header("ETag", etag);
+          return c.body(null, 304);
+        }
+
+        // 4. 设置响应头
+        c.header("Content-Type", file.mimeType || contentType || "application/octet-stream");
+        if (contentLength !== undefined) {
+          c.header("Content-Length", String(contentLength));
+        }
         c.header("Cache-Control", CACHE_CONTROL);
         if (etag) c.header("ETag", etag);
-        return c.body(null, 304);
-      }
 
-      // 4. 设置响应头
-      c.header("Content-Type", file.mimeType || contentType || "application/octet-stream");
-      if (contentLength !== undefined) {
-        c.header("Content-Length", String(contentLength));
+        // 5. 流式传输
+        return stream(c, async (s) => {
+          for await (const chunk of fileStream) {
+            await s.write(chunk as Uint8Array);
+          }
+        });
+      } catch (err) {
+        // 响应头在 getFileStream 成功之后才设，所以这里穿透到磁盘分支是安全的
+        logger.warn(
+          `[getResource] s3 failed for ${file.storageKey}, falling back to disk: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
       }
-      c.header("Cache-Control", CACHE_CONTROL);
-      if (etag) c.header("ETag", etag);
-
-      // 5. 流式传输
-      return stream(c, async (s) => {
-        for await (const chunk of fileStream) {
-          await s.write(chunk as Uint8Array);
-        }
-      });
     }
 
-    // 6. 开发回退：从本地 resources/<gameSlug>/ 目录读取（MinIO 无文件时）
+    // 6. 磁盘回退：读本地 resources/<gameSlug>/
+    //    两种情况会走到这里——DB 没有该文件记录（sword1/sword2），或上面的 S3 取用失败
     const relativePath = pathSegments.join("/");
     const gameResourceRoot = path.join(RESOURCE_ROOT, gameSlug);
     let localPath = path.join(gameResourceRoot, relativePath);
