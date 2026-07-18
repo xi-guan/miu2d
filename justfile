@@ -1,6 +1,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 server_image := "gitea.susie.se/coaster/miu2d-server"
+game_image := "gitea.susie.se/coaster/miu2d-game-"
 
 _default:
     @just --list --unsorted --list-heading '' --list-prefix='- '
@@ -153,3 +154,31 @@ release:
     echo "  sudo docker compose pull && sudo docker compose up -d"
     echo "  sudo docker ps | grep miu2d-server        # Up, not Restarting"
     echo "  curl -s -o /dev/null -w '%{http_code}\\n' http://localhost:8090/trpc/auth.me   # 200, not 502"
+
+# build a game content image (assets + db seed) and push it to gitea
+release-game slug:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    hash=$(git rev-parse --short HEAD)
+    [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
+    [ -d "resources/{{slug}}" ] || { echo "✗ resources/{{slug}} not found"; exit 1; }
+    echo "→ exporting {{slug}} seed from local db (needs: just db up)"
+    (cd packages/server && bunx tsx --tsconfig tsconfig.dev.json scripts/export-game-seed.ts {{slug}})
+    docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
+    echo "→ building {{game_image}}{{slug}} (amd64 + arm64) @ $hash"
+    # no --no-cache here (unlike `release`): this image is pure COPY with no
+    # workspace/bundler resolution, so it has none of the non-determinism that
+    # poisoned the server image's cache
+    docker buildx build --builder miu2d --platform linux/amd64,linux/arm64 \
+        --file docker/game-content.Dockerfile \
+        --build-context assets=resources/{{slug}} \
+        --build-context seed=.data/game-seeds \
+        --build-arg SLUG={{slug}} --build-arg REV=$hash \
+        --tag {{game_image}}{{slug}}:$hash --tag {{game_image}}{{slug}}:latest \
+        --push docker/
+    echo "✓ pushed {{game_image}}{{slug}}:$hash (amd64 + arm64)"
+    echo ""
+    echo "── on NAS (192.168.1.63), in the miu2d compose dir ──"
+    echo "  sudo docker compose pull && sudo docker compose up -d"
+    echo "  sudo docker logs miu2d-game-{{slug}}     # assets installed / up-to-date"
+    echo "  sudo docker logs miu2d-server | grep seed"

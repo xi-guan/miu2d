@@ -57,6 +57,8 @@ export const env = {
   saveScreenshotDir: str("SAVE_SCREENSHOT_DIR", "../../.data/save-screenshots"),
   /** 磁盘资源根目录（相对 cwd）；docker 把 resources 挂到 ../../resources = /app/resources */
   resourceRoot: str("RESOURCE_ROOT", "../../resources"),
+  /** 游戏内容种子目录（相对 cwd）；游戏内容镜像把 <slug>.json 拷到这里，启动时播种 */
+  seedDir: str("SEED_DIR", "../../.data/game-seeds"),
 
   // ---------- Email / SMTP ----------
   smtpHost: str("SMTP_HOST"),

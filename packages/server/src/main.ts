@@ -9,6 +9,7 @@ import { cors } from "hono/cors";
 // Import all module routers to register them (side-effect imports)
 import "./modules";
 
+import { seedGames } from "./db/seed-games";
 import { env } from "./env";
 import { dataRoutes } from "./routes/data.routes";
 import { fileRoutes } from "./routes/file.routes";
@@ -104,6 +105,8 @@ app.use("/trpc/*", async (c, next) => {
 app.use("/trpc/*", trpcServer({ router: appRouter, createContext }));
 
 async function bootstrap() {
+  await seedGames();
+
   const port = env.port;
   serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
     console.log(`Application is running on: http://0.0.0.0:${port}`);

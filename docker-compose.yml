@@ -40,6 +40,17 @@ services:
       timeout: 5s
       retries: 5
 
+  # 游戏内容 (素材 + DB 种子)。init 容器: 投放到共享卷后退出, server 等它跑完
+  game-sword2:
+    image: gitea.susie.se/coaster/miu2d-game-sword2:latest
+    container_name: miu2d-game-sword2
+    volumes:
+      - game-assets:/assets
+      - game-seeds:/seeds
+    restart: "no"
+    profiles:
+      - production
+
   # 后端服务 (生产环境用)
   server:
     image: miu2d-server:latest
@@ -55,16 +66,24 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
       MINIO_BUCKET: ${MINIO_BUCKET:-miu2d}
+      SEED_DIR: /app/seeds
     ports:
       - "4100:4000"
     volumes:
       # sword1/sword2 走磁盘回退 (yueying 走 RustFS); RESOURCE_ROOT 在容器内解析到 /app/resources
+      #
+      # 目标态是换成 `- game-assets:/app/resources:ro`，由内容镜像投放素材。但那要等
+      # 所有走磁盘回退的游戏都打包完 —— 现在只有 sword2 有内容镜像，提前切会让 sword1
+      # 素材整个消失（404 黑屏）。种子那半边不受影响，已经可以用。
       - ./resources:/app/resources:ro
+      - game-seeds:/app/seeds:ro
     depends_on:
       db:
         condition: service_healthy
       rustfs:
         condition: service_healthy
+      game-sword2:
+        condition: service_completed_successfully
     networks:
       - app-network
     restart: unless-stopped
@@ -91,3 +110,8 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  # 游戏内容镜像写入、server 只读挂载
+  game-assets:
+  game-seeds:
