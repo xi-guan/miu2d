@@ -51,6 +51,26 @@ services:
     profiles:
       - production
 
+  game-sword1:
+    image: gitea.susie.se/coaster/miu2d-game-sword1:latest
+    container_name: miu2d-game-sword1
+    volumes:
+      - game-assets:/assets
+      - game-seeds:/seeds
+    restart: "no"
+    profiles:
+      - production
+
+  game-yueying:
+    image: gitea.susie.se/coaster/miu2d-game-yueying:latest
+    container_name: miu2d-game-yueying
+    volumes:
+      - game-assets:/assets
+      - game-seeds:/seeds
+    restart: "no"
+    profiles:
+      - production
+
   # 后端服务 (生产环境用)
   server:
     image: miu2d-server:latest
@@ -70,12 +90,9 @@ services:
     ports:
       - "4100:4000"
     volumes:
-      # sword1/sword2 走磁盘回退 (yueying 走 RustFS); RESOURCE_ROOT 在容器内解析到 /app/resources
-      #
-      # 目标态是换成 `- game-assets:/app/resources:ro`，由内容镜像投放素材。但那要等
-      # 所有走磁盘回退的游戏都打包完 —— 现在只有 sword2 有内容镜像，提前切会让 sword1
-      # 素材整个消失（404 黑屏）。种子那半边不受影响，已经可以用。
-      - ./resources:/app/resources:ro
+      # 素材由三个内容镜像投放进 game-assets 卷，各占 /app/resources/<slug>/
+      # 三个游戏都打包完了才切到这里；少一个那个游戏会整个 404 黑屏
+      - game-assets:/app/resources:ro
       - game-seeds:/app/seeds:ro
     depends_on:
       db:
@@ -83,6 +100,10 @@ services:
       rustfs:
         condition: service_healthy
       game-sword2:
+        condition: service_completed_successfully
+      game-sword1:
+        condition: service_completed_successfully
+      game-yueying:
         condition: service_completed_successfully
     networks:
       - app-network
