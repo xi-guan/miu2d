@@ -1,6 +1,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 server_image := "gitea.susie.se/coaster/miu2d-server"
+web_image := "gitea.susie.se/coaster/miu2d-web"
 game_image := "gitea.susie.se/coaster/miu2d-game-"
 
 _default:
@@ -154,6 +155,28 @@ release:
     echo "  sudo docker compose pull && sudo docker compose up -d"
     echo "  sudo docker ps | grep miu2d-server        # Up, not Restarting"
     echo "  curl -s -o /dev/null -w '%{http_code}\\n' http://localhost:8090/trpc/auth.me   # 200, not 502"
+
+# build web image (amd64 + arm64), push manifest to gitea
+release-web:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    hash=$(git rev-parse --short HEAD)
+    [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
+    docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
+    echo "→ building {{web_image}} (amd64 + arm64) @ $hash"
+    # VITE_* / STATIC_ONLY are left at their Dockerfile defaults on purpose: verified
+    # against the deployed image (bundle bakes /s3/miu2d, no resource domain = same
+    # origin, nginx.conf not nginx.static.conf). passing them explicitly would only
+    # create a second place to keep in sync
+    docker buildx build --builder miu2d --no-cache --platform linux/amd64,linux/arm64 \
+        --file packages/web/Dockerfile --target runner \
+        --build-arg COMMIT_HASH=$hash \
+        --tag {{web_image}}:$hash --tag {{web_image}}:latest \
+        --push .
+    echo "✓ pushed {{web_image}}:$hash (amd64 + arm64)"
+    echo ""
+    echo "── on NAS (192.168.1.63), in the miu2d compose dir ──"
+    echo "  sudo docker compose pull && sudo docker compose up -d"
 
 # build a game content image (assets + db seed) and push it to gitea
 release-game slug:
