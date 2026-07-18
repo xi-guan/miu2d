@@ -10,9 +10,9 @@ export const TILE_HEIGHT = 32;
 // Globals.cs: BaseSpeed = 100, RunSpeedFold = 8
 // Movement uses: Velocity * elapsedSeconds * speedFold
 // Walk: speedFold = WalkSpeed (default 1)
-// Run: speedFold = RunSpeedFold (default 8)
+// Run: speedFold = RunSpeedFold (default 4)
 export const BASE_SPEED = 100;
-export const RUN_SPEED_FOLD = 8; // original Globals.RunSpeedFold; the public config endpoint never sends per-game speed, so this governs run speed for every game
+export const RUN_SPEED_FOLD = 4; // fallback when a game has no player.speed config; the original's 8 reads too fast here
 export const DEFAULT_RUN_SPEED = BASE_SPEED * RUN_SPEED_FOLD;
 export const MIN_CHANGE_MOVE_SPEED_PERCENT = -90;
 

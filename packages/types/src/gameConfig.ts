@@ -166,8 +166,8 @@ export type PlayerRestore = z.infer<typeof PlayerRestoreSchema>;
 export const PlayerSpeedSchema = z.object({
   /** 基础移动速度 */
   baseSpeed: z.number().int().min(1).default(100),
-  /** 跑步速度倍数 */
-  runSpeedFold: z.number().int().min(1).default(8),
+  /** 跑步速度倍数（原版为 8，实测偏快，默认降到 4） */
+  runSpeedFold: z.number().int().min(1).default(4),
   /** 最低减速百分比 (-100 ~ 0) */
   minChangeMoveSpeedPercent: z.number().int().min(-100).max(0).default(-90),
 });
@@ -401,7 +401,7 @@ export function createDefaultPlayerConfig(): PlayerConfig {
     },
     speed: {
       baseSpeed: 100,
-      runSpeedFold: 8,
+      runSpeedFold: 4,
       minChangeMoveSpeedPercent: -90,
     },
     combat: {
