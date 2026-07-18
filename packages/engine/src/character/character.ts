@@ -359,7 +359,7 @@ export abstract class Character extends CharacterCombat {
   }
 
   protected updateRunning(deltaTime: number): void {
-    const speedFold = getGameConfig()?.speed?.runSpeedFold ?? RUN_SPEED_FOLD;
+    const speedFold = getGameConfig()?.player?.speed?.runSpeedFold ?? RUN_SPEED_FOLD;
     this.moveAlongPath(deltaTime, speedFold);
     super.update(deltaTime);
   }
