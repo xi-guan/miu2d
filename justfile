@@ -154,7 +154,8 @@ release:
     echo "── on NAS (192.168.1.63), in the miu2d compose dir ──"
     echo "  sudo docker compose pull && sudo docker compose up -d"
     echo "  sudo docker ps | grep miu2d-server        # Up, not Restarting"
-    echo "  curl -s -o /dev/null -w '%{http_code}\\n' http://localhost:8090/trpc/auth.me   # 200, not 502"
+    # 别用 /trpc/auth.me —— 没有这个 procedure，恒 404，分不出好坏。这条穿透 nginx→server→db
+    echo "  curl -s -o /dev/null -w '%{http_code}\\n' http://localhost:8090/game/yueying/api/config   # 200"
 
 # build web image (amd64 + arm64), push manifest to gitea
 release-web:
