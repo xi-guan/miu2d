@@ -49,6 +49,15 @@ COPY packages/server/prisma ./packages/server/prisma
 WORKDIR /app/packages/server
 RUN bun run build
 
+# runner 阶段没有 packages/*/dist，任何残留的 @miu2d import 都会让 node 启动即崩。
+# 这条断言曾经缺席：一次双架构构建里 amd64 漏了 @miu2d/types，坏镜像一路 push 到线上
+RUN test -f dist/main.js && \
+    if grep -rq --include="*.js" 'from "@miu2d/' dist; then \
+        echo "✗ dist 残留未内联的 @miu2d import —— rolldown 解析降级了"; \
+        grep -rn --include="*.js" 'from "@miu2d/' dist | head; \
+        exit 1; \
+    fi
+
 # 生产阶段
 FROM node:24-bookworm-slim AS runner
 

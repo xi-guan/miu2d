@@ -1,5 +1,7 @@
-import resolve from "@rollup/plugin-node-resolve";
+import { fileURLToPath } from "node:url";
 import typescript from "@rollup/plugin-typescript";
+
+const workspace = (rel) => fileURLToPath(new URL(rel, import.meta.url));
 
 /** @type {import('rolldown').RolldownOptions} */
 export default {
@@ -23,6 +25,15 @@ export default {
       !id.startsWith("/") &&
       !id.startsWith("@/") &&
       !id.startsWith("@miu2d/")),
+  // 显式 alias 取代 @rollup/plugin-node-resolve：后者在 rolldown 的并行解析下会竞态，
+  // 同一个 @miu2d/types 一半内联、一半漏成 external，双架构构建里 amd64 那份就这么
+  // 带着裸 import 上了线（runner 阶段没有 packages/*/dist，node 起不来）
+  resolve: {
+    alias: {
+      "@miu2d/types": workspace("../types/dist/index.js"),
+      "@miu2d/shared/locales": workspace("../shared/dist/locales/index.js"),
+    },
+  },
   // an unresolved @miu2d import once shipped silently as external and crashed prod — fail loudly
   onwarn(warning, warn) {
     if (warning.code === "UNRESOLVED_IMPORT") throw new Error(warning.message);
@@ -30,8 +41,6 @@ export default {
   },
   // JSON is handled natively by rolldown — @rollup/plugin-json no longer needed
   plugins: [
-    // 解析 @miu2d/* 工作区包，从其 src 直接打包
-    resolve({ resolveOnly: [/@miu2d\//] }),
     // Keep @rollup/plugin-typescript for emitDecoratorMetadata support (not yet in Oxc)
     typescript({
       tsconfig: "./tsconfig.build.json",
