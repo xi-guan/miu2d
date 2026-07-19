@@ -29,6 +29,10 @@ const CACHE_CONTROL = env.isProd ? `public, max-age=${env.assetCacheMaxAge}` : "
 const CACHE_TTL_MS = 60_000;
 const gameIdCache = new Map<string, { v: string | null; exp: number }>();
 const fileCache = new Map<string, { v: Awaited<ReturnType<typeof resolveFilePath>>; exp: number }>();
+
+// after an s3 failure skip it for a cooldown, else every request eats a dead connect
+const S3_COOLDOWN_MS = 60_000;
+let s3DownUntil = 0;
 // 大小写兜底的结果；没有它每次未命中都要逐层 readdir
 const diskPathCache = new Map<string, { v: string | null; exp: number }>();
 
@@ -154,43 +158,46 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
 
       // 3. 从 S3 获取文件流。失败不直接 500——S3 整个挂掉时曾让 yueying 全线黑屏，
       //    而磁盘上通常有同一份素材，降级读盘远好过不可用
-      try {
-        const ifNoneMatch = c.req.header("if-none-match");
-        const {
-          stream: fileStream,
-          contentType,
-          contentLength,
-          etag,
-          notModified,
-        } = await s3.getFileStream(file.storageKey, ifNoneMatch);
+      if (Date.now() >= s3DownUntil) {
+        try {
+          const ifNoneMatch = c.req.header("if-none-match");
+          const {
+            stream: fileStream,
+            contentType,
+            contentLength,
+            etag,
+            notModified,
+          } = await s3.getFileStream(file.storageKey, ifNoneMatch);
 
-        if (notModified) {
+          if (notModified) {
+            c.header("Cache-Control", CACHE_CONTROL);
+            if (etag) c.header("ETag", etag);
+            return c.body(null, 304);
+          }
+
+          // 4. 设置响应头
+          c.header("Content-Type", file.mimeType || contentType || "application/octet-stream");
+          if (contentLength !== undefined) {
+            c.header("Content-Length", String(contentLength));
+          }
           c.header("Cache-Control", CACHE_CONTROL);
           if (etag) c.header("ETag", etag);
-          return c.body(null, 304);
-        }
 
-        // 4. 设置响应头
-        c.header("Content-Type", file.mimeType || contentType || "application/octet-stream");
-        if (contentLength !== undefined) {
-          c.header("Content-Length", String(contentLength));
+          // 5. 流式传输
+          return stream(c, async (s) => {
+            for await (const chunk of fileStream) {
+              await s.write(chunk as Uint8Array);
+            }
+          });
+        } catch (err) {
+          // 响应头在 getFileStream 成功之后才设，所以这里穿透到磁盘分支是安全的
+          s3DownUntil = Date.now() + S3_COOLDOWN_MS;
+          logger.warn(
+            `[getResource] s3 failed for ${file.storageKey}, falling back to disk: ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          );
         }
-        c.header("Cache-Control", CACHE_CONTROL);
-        if (etag) c.header("ETag", etag);
-
-        // 5. 流式传输
-        return stream(c, async (s) => {
-          for await (const chunk of fileStream) {
-            await s.write(chunk as Uint8Array);
-          }
-        });
-      } catch (err) {
-        // 响应头在 getFileStream 成功之后才设，所以这里穿透到磁盘分支是安全的
-        logger.warn(
-          `[getResource] s3 failed for ${file.storageKey}, falling back to disk: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
       }
     }
 

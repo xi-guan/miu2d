@@ -22,7 +22,7 @@ setup:
     bun run --filter=@miu2d/types build
     echo "✓ setup complete"
 
-# start db + rustfs containers
+# start db container
 db verb:
     @just _db-{{verb}}
 
@@ -30,9 +30,9 @@ db verb:
 _db-up:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "→ starting db and rustfs"
-    env -u DOCKER_DEFAULT_PLATFORM docker compose up -d db rustfs
-    echo "✓ containers up (postgres :5533, rustfs api :9110 console :9101)"
+    echo "→ starting db"
+    env -u DOCKER_DEFAULT_PLATFORM docker compose up -d db
+    echo "✓ container up (postgres :5533)"
 
 [private]
 _db-down:

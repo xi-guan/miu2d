@@ -96,6 +96,9 @@ services:
     build:
       context: .
       dockerfile: packages/web/Dockerfile
+    volumes:
+      # nginx 直供 sword1/sword2 素材，与 server 挂同一份卷
+      - game-assets:/assets:ro
     ports:
       - "8080:80"
     depends_on:
