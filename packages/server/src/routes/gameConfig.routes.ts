@@ -21,8 +21,14 @@ import { resolveUserId } from "../utils/session";
 
 const logger = new Logger("GameConfigRoutes");
 
+/** Jimp 1.6 装了哪些解码器就支持哪些格式，webp/avif/heic 需要额外的 wasm 包 */
+const SUPPORTED_LOGO_FORMATS = "PNG, JPEG, BMP, GIF, TIFF";
+
 /** PWA 图标尺寸规格 */
 const LOGO_SIZES = [512, 192, 128] as const;
+
+/** 源图尺寸下限 */
+const MIN_LOGO_SIZE = 256;
 type LogoSize = (typeof LOGO_SIZES)[number];
 
 /** Logo 在 S3 中的存储 key（原图） */
@@ -260,12 +266,21 @@ gameConfigRoutes.post(":gameSlug/api/logo", async (c) => {
       return c.json({ error: "File too large (max 5MB)" }, 400);
     }
 
-    // 验证图片尺寸：必须 >= 512x512
-    const { width, height } = (await Jimp.read(body)).bitmap;
-    if (!width || !height || width < 512 || height < 512) {
+    // 解码失败是客户端传了 Jimp 不认的格式（webp/avif/heic），属输入问题，别当 500 抛出去
+    let bitmap: { width: number; height: number };
+    try {
+      bitmap = (await Jimp.read(body)).bitmap;
+    } catch {
+      return c.json({ error: `Unsupported image format (${SUPPORTED_LOGO_FORMATS})` }, 400);
+    }
+
+    // 下限取最小那档变体：128/192 缩得清晰，只有 512 档会被放大糊掉，
+    // 自部署场景不值得为此卡住上传（PWA 桌面图标才用得到 512）
+    const { width, height } = bitmap;
+    if (!width || !height || width < MIN_LOGO_SIZE || height < MIN_LOGO_SIZE) {
       return c.json(
         {
-          error: `Logo must be at least 512x512 pixels (got ${width}x${height})`,
+          error: `Logo must be at least ${MIN_LOGO_SIZE}x${MIN_LOGO_SIZE} pixels (got ${width}x${height})`,
         },
         400
       );

@@ -362,6 +362,46 @@ function BossLevelBonusEditor({
   );
 }
 
+/**
+ * 按文件头判断服务端 Jimp 能否解码。不能信 file.type——它是浏览器按扩展名猜的，
+ * 而 Jimp 认的是内容：一张叫 .png 实为 webp 的图会当场骗过类型检查
+ */
+async function isServerDecodable(file: File): Promise<boolean> {
+  const b = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const magic = (...bytes: number[]) => bytes.every((v, i) => b[i] === v);
+
+  return (
+    magic(0x89, 0x50, 0x4e, 0x47) || // PNG
+    magic(0xff, 0xd8, 0xff) || //       JPEG
+    magic(0x47, 0x49, 0x46, 0x38) || // GIF8
+    magic(0x42, 0x4d) || //             BMP
+    magic(0x49, 0x49, 0x2a, 0x00) || // TIFF little-endian
+    magic(0x4d, 0x4d, 0x00, 0x2a) //    TIFF big-endian
+  );
+}
+
+/**
+ * webp/avif/heic 这些 Jimp 解不了的格式先在浏览器画一遍再导出 PNG——
+ * canvas 认得的格式比服务端多，且省掉一个 wasm 解码依赖
+ */
+async function toServerDecodable(file: File): Promise<Blob> {
+  if (await isServerDecodable(file)) return file;
+
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("浏览器无法转换这张图片"))),
+      "image/png"
+    );
+  });
+}
+
 // ========== 各分类面板 ==========
 
 function BasicInfoPanel({
@@ -439,10 +479,18 @@ function BasicInfoPanel({
 
     setIsUploading(true);
     try {
+      const body = await toServerDecodable(file);
+
+      // 转 PNG 常常比原图大（webp 尤其），所以体积要在转换之后再判一次
+      if (body.size > 5 * 1024 * 1024) {
+        toast.error("转换成 PNG 后超过 5MB，请换一张尺寸小些的图");
+        return;
+      }
+
       const res = await fetch(getGameApiUrl(gameSlug, "logo"), {
         method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file,
+        headers: { "Content-Type": body.type },
+        body,
         credentials: "include",
       });
 
@@ -524,7 +572,7 @@ function BasicInfoPanel({
           </Field>
           <Field
             label="空间 Logo"
-            desc="上传空间 Logo，将作为网页图标和游戏标题界面标识显示。支持 PNG、JPG、WebP 等格式，最大 5MB"
+            desc="上传空间 Logo，将作为网页图标和游戏标题界面标识显示。支持 PNG、JPG、WebP 等格式，最小 256×256 像素（建议 512×512 以上），最大 5MB"
           >
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-lg border border-widget-border bg-[#1a1a1a] flex items-center justify-center overflow-hidden flex-shrink-0">
