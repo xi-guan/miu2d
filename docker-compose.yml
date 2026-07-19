@@ -19,27 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # RustFS 文件存储 (S3 兼容, 替代已归档的 MinIO)
-  rustfs:
-    image: rustfs/rustfs:1.0.0-beta.8
-    container_name: miu2d-rustfs
-    environment:
-      RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
-      RUSTFS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
-      RUSTFS_CONSOLE_ENABLE: "true"
-    ports:
-      - "9110:9000"   # API
-      - "9101:9001"   # Console
-    volumes:
-      - ./.data/rustfs:/data
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # 游戏内容 (素材 + DB 种子)。init 容器: 投放到共享卷后退出, server 等它跑完
   game-sword2:
     image: gitea.susie.se/coaster/miu2d-game-sword2:latest
@@ -84,10 +63,6 @@ services:
       # V8 堆上限: 泄漏时抛可捕获的 OOM, 而不是被内核 SIGKILL 掉整个容器
       NODE_OPTIONS: --max-old-space-size=1024
       PORT: 4000
-      S3_ENDPOINT: http://rustfs:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
-      MINIO_BUCKET: ${MINIO_BUCKET:-miu2d}
       SEED_DIR: /app/seeds
     ports:
       - "4100:4000"
@@ -96,10 +71,11 @@ services:
       # 三个游戏都打包完了才切到这里；少一个那个游戏会整个 404 黑屏
       - game-assets:/app/resources:ro
       - game-seeds:/app/seeds:ro
+      # 用户上传 (存档截图 + logo)。2026-07-19 起这是主存储不再是 S3 回退，
+      # 不挂载的话写进容器层，重建即丢。路径按 cwd(/app/packages/server) 解析
+      - ./.data/save-screenshots:/app/.data/save-screenshots
     depends_on:
       db:
-        condition: service_healthy
-      rustfs:
         condition: service_healthy
       game-sword2:
         condition: service_completed_successfully
