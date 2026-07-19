@@ -81,6 +81,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-miu2d_db}
       NODE_ENV: production
+      # V8 堆上限: 泄漏时抛可捕获的 OOM, 而不是被内核 SIGKILL 掉整个容器
+      NODE_OPTIONS: --max-old-space-size=1024
       PORT: 4000
       S3_ENDPOINT: http://rustfs:9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
