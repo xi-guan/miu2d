@@ -3,7 +3,6 @@
  *
  * GET /game/:gameSlug/api/config    - 获取游戏全局配置
  * GET /game/:gameSlug/api/manifest  - 获取游戏专属 PWA Manifest（动态）
- * GET /game/:gameSlug/api/logo      - 获取游戏 Logo 原图
  * GET /game/:gameSlug/api/logo/:size - 获取指定尺寸 Logo（128/192/512）
  * POST /game/:gameSlug/api/logo     - 上传游戏 Logo（>=512px，自动生成多尺寸，需认证）
  * DELETE /game/:gameSlug/api/logo   - 删除游戏 Logo（需认证）
@@ -11,11 +10,11 @@
 
 import { createDefaultGameConfig, GameConfigDataSchema } from "@miu2d/types";
 import { Hono } from "hono";
-import { stream } from "hono/streaming";
 import { Jimp } from "jimp";
 import { db } from "../db/client";
 import type { Prisma } from "../db/generated/prisma/client";
 import { gameConfigService } from "../modules/gameConfig/gameConfig.service";
+import { deleteBlob, getBlob, putBlob } from "../storage/local-blob";
 import * as s3 from "../storage/s3";
 import { Logger } from "../utils/logger";
 import { resolveUserId } from "../utils/session";
@@ -39,6 +38,27 @@ function logoSizedKey(gameId: string, size: LogoSize): string {
 /** 所有尺寸变体 + 原图的 key 列表 */
 function allLogoKeys(gameId: string): string[] {
   return [logoStorageKey(gameId), ...LOGO_SIZES.map((size) => logoSizedKey(gameId, size))];
+}
+
+/** 删 logo：本地盘 + S3 残留一起清，S3 那份删失败只留孤儿对象，不影响一致性 */
+async function removeLogos(gameId: string): Promise<void> {
+  await Promise.all(
+    allLogoKeys(gameId).flatMap((k) => [deleteBlob(k), s3.deleteFile(k).catch(() => {})])
+  );
+}
+
+/**
+ * 读 logo：先本地盘，miss 再回退 S3 —— 2026-07-19 之前上传的 logo 还只在 rustfs 里。
+ * S3 退役前把残留对象拷进上传目录，届时这里的回退分支可以整块删掉
+ */
+async function readLogo(key: string): Promise<Buffer | null> {
+  const local = await getBlob(key);
+  if (local) return local;
+  try {
+    return await s3.downloadFile(key);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -161,7 +181,7 @@ gameConfigRoutes.get(":gameSlug/api/manifest", async (c) => {
 
 /**
  * 获取游戏 Logo 指定尺寸变体（128/192/512）
- * 供 dashboard 等后台页面使用；游戏前端直接用 getS3Url 拼 S3 地址
+ * dashboard 和游戏前端都走这条；bucket 是私有的，裸 /s3 URL 会 403
  */
 gameConfigRoutes.get(":gameSlug/api/logo/:size", async (c) => {
   try {
@@ -182,31 +202,16 @@ gameConfigRoutes.get(":gameSlug/api/logo/:size", async (c) => {
       return c.json({ error: "Game not found" }, 404);
     }
 
-    const key = logoSizedKey(game.id, size);
-    const { stream: fileStream, contentType, contentLength, notModified } = await s3.getFileStream(
-      key,
-      c.req.header("if-none-match")
-    );
+    // 变体固定是 generateLogoVariants 出的 png；logo 最大 5MB，整块读比流省事
+    const buf = await readLogo(logoSizedKey(game.id, size));
+    if (!buf) return c.json({ error: "Logo not found" }, 404);
 
-    if (notModified) return c.body(null, 304);
-
-    c.header("Content-Type", contentType || "image/png");
-    if (contentLength) c.header("Content-Length", String(contentLength));
+    c.header("Content-Type", "image/png");
     c.header("Cache-Control", "public, max-age=86400");
-
-    return stream(c, async (s) => {
-      for await (const chunk of fileStream) {
-        await s.write(chunk as Uint8Array);
-      }
-    });
+    // 重包一层：node 的 Buffer<ArrayBufferLike> 不满足 hono 要的 Uint8Array<ArrayBuffer>
+    return c.body(new Uint8Array(buf));
   } catch (error) {
-    // logo not yet uploaded → MinIO 404; SDK may throw NoSuchKey or an
-    // xml-deserialization error whose $metadata still carries httpStatusCode 404
-    const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata
-      ?.httpStatusCode;
-    if ((error instanceof Error && error.name === "NoSuchKey") || status === 404) {
-      return c.json({ error: "Logo not found" }, 404);
-    }
+    // 「没上传过」现在由 readLogo 返回 null 覆盖，走到这里的都是真异常
     logger.error("[getLogoSized] Error:", error);
     return c.json({ error: "Logo not found" }, 404);
   }
@@ -269,13 +274,12 @@ gameConfigRoutes.post(":gameSlug/api/logo", async (c) => {
     // 生成所有尺寸变体（512/192/128）
     const variants = await generateLogoVariants(body);
 
-    const contentType = c.req.header("content-type") || "image/png";
     const key = logoStorageKey(game.id);
 
-    // 上传原图 + 所有变体
-    await s3.uploadFile(key, body, contentType);
+    // 落盘原图 + 所有变体（原图只作重新生成变体的源，对外只暴露变体）
+    await putBlob(key, body);
     await Promise.all(
-      variants.map(({ size, buf }) => s3.uploadFile(logoSizedKey(game.id, size), buf, "image/png"))
+      variants.map(({ size, buf }) => putBlob(logoSizedKey(game.id, size), buf))
     );
 
     const logoUrl = logoStorageKey(game.id);
@@ -301,12 +305,12 @@ gameConfigRoutes.post(":gameSlug/api/logo", async (c) => {
         });
       }
     } catch (dbError) {
-      // DB 写入失败：回滚 S3 上传，避免产生孤立文件
-      logger.error("[uploadLogo] DB update failed, rolling back S3 upload:", dbError);
+      // DB 写入失败：回滚已落盘的 logo，避免产生孤立文件
+      logger.error("[uploadLogo] DB update failed, rolling back logo files:", dbError);
       try {
-        await Promise.all(allLogoKeys(game.id).map((k) => s3.deleteFile(k).catch(() => {})));
-      } catch (s3Error) {
-        logger.error("[uploadLogo] S3 rollback also failed:", s3Error);
+        await removeLogos(game.id);
+      } catch (rollbackError) {
+        logger.error("[uploadLogo] rollback also failed:", rollbackError);
       }
       throw dbError;
     }
@@ -362,11 +366,11 @@ gameConfigRoutes.delete(":gameSlug/api/logo", async (c) => {
       });
     }
 
-    // DB 更新成功后，清理 S3（失败只产生孤立对象，不影响一致性）
+    // DB 更新成功后再清文件（失败只产生孤立文件，不影响一致性）
     try {
-      await Promise.all(allLogoKeys(game.id).map((k) => s3.deleteFile(k).catch(() => {})));
+      await removeLogos(game.id);
     } catch {
-      logger.warn(`[deleteLogo] S3 cleanup failed for game ${game.id}, orphaned objects may exist`);
+      logger.warn(`[deleteLogo] cleanup failed for game ${game.id}, orphaned files may exist`);
     }
 
     logger.log(`[deleteLogo] Logo deleted for game ${gameSlug}`);

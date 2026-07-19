@@ -46,7 +46,6 @@ export {
   fetchGameApiBinary,
   getResourceDomain,
   getResourceUrl,
-  getS3Url,
 } from "./lib/game-api";
 export type { TranslationSchema } from "./locales";
 // ============= Server Locales =============

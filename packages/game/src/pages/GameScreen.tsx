@@ -19,7 +19,7 @@ import type { UiTheme } from "@miu2d/engine/gui/ui-settings";
 import { setUiTheme } from "@miu2d/engine/gui/ui-settings";
 import { getResourceUrl, ResourcePath, setResourcePaths } from "@miu2d/engine/resource";
 import type { SaveData } from "@miu2d/engine/storage";
-import { getResourceDomain, getS3Url, trpc, useMobile } from "@miu2d/shared";
+import { getResourceDomain, trpc, useMobile } from "@miu2d/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HiOutlineCog6Tooth } from "react-icons/hi2";
 import { useParams, useSearchParams } from "react-router-dom";

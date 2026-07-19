@@ -53,8 +53,12 @@ export const env = {
   s3Bucket: str("MINIO_BUCKET", "miu2d"),
   /** 客户端可访问的 S3 endpoint（开发走代理，生产走 CDN） */
   s3PublicEndpoint: str("S3_PUBLIC_ENDPOINT", "/s3"),
-  /** S3 不可用时存档截图的磁盘回退目录（相对 cwd，即 packages/server） */
-  saveScreenshotDir: str("SAVE_SCREENSHOT_DIR", "../../.data/save-screenshots"),
+  /**
+   * 用户上传落盘根目录（相对 cwd，即 packages/server）：存档截图 + 游戏 logo，
+   * 目录内 key 结构与 S3 一致。变量名沿用 SAVE_SCREENSHOT_DIR —— NAS 上按这个名字
+   * bind mount 着，改名要同步改部署，不值得
+   */
+  uploadDir: str("SAVE_SCREENSHOT_DIR", "../../.data/save-screenshots"),
   /** 磁盘资源根目录（相对 cwd）；docker 把 resources 挂到 ../../resources = /app/resources */
   resourceRoot: str("RESOURCE_ROOT", "../../resources"),
   /** 游戏内容种子目录（相对 cwd）；游戏内容镜像把 <slug>.json 拷到这里，启动时播种 */

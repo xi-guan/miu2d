@@ -2,7 +2,7 @@
  * 数据统计页面
  */
 
-import { getS3Url, trpc } from "@miu2d/shared";
+import { trpc } from "@miu2d/shared";
 import { ResponsiveGrid } from "@miu2d/ui";
 import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -247,11 +247,7 @@ export function PlayerSavesPage() {
                 >
                   {save.screenshot ? (
                     <img
-                      src={
-                        save.screenshot.startsWith("data:")
-                          ? save.screenshot
-                          : getS3Url(save.screenshot)
-                      }
+                      src={save.screenshot}
                       alt={save.name}
                       className="w-full h-full object-cover"
                     />
@@ -438,11 +434,7 @@ export function PlayerSavesPage() {
                     <div className="flex items-center gap-3 px-4 py-2 border-b border-panel-border shrink-0">
                       {saveDetailQuery.data.screenshot && (
                         <img
-                          src={
-                            saveDetailQuery.data.screenshot.startsWith("data:")
-                              ? saveDetailQuery.data.screenshot
-                              : getS3Url(saveDetailQuery.data.screenshot)
-                          }
+                          src={saveDetailQuery.data.screenshot}
                           alt=""
                           className="w-16 h-10 rounded object-cover border border-widget-border shrink-0"
                         />

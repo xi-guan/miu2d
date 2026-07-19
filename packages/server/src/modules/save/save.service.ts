@@ -11,7 +11,7 @@ import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
 import type { Prisma, Save as PrismaSave } from "../../db/generated/prisma/client";
 import { env } from "../../env";
-import { deleteFile, downloadFile, uploadFile } from "../../storage/s3";
+import { deleteFile, downloadFile } from "../../storage/s3";
 import { verifyGameOwnerAccess } from "../../utils/gameAccess";
 import { Logger } from "../../utils/logger.js";
 
@@ -19,7 +19,7 @@ const logger = new Logger("SaveService");
 
 /** 磁盘回退截图的 key 前缀，用于与 S3 key 区分 */
 const LOCAL_PREFIX = "local:";
-const SCREENSHOT_ROOT = path.resolve(env.saveScreenshotDir);
+const SCREENSHOT_ROOT = path.resolve(env.uploadDir);
 
 function isBase64DataUri(str: string): boolean {
   return str.startsWith("data:image/");
@@ -29,55 +29,59 @@ function isLocalKey(key: string): boolean {
   return key.startsWith(LOCAL_PREFIX);
 }
 
-/** local: key → 磁盘绝对路径；越界返回 null（screenshot 允许客户端直传字符串，需防路径遍历） */
+/**
+ * key → 磁盘绝对路径；越界返回 null（screenshot 允许客户端直传字符串，需防路径遍历）。
+ * 磁盘布局与 S3 key 同构，所以带不带 local: 前缀都能落到同一个位置 ——
+ * 旧存档的裸 key 等 S3 残留拷进来后无需改 DB 就能直接读
+ */
 function localScreenshotPath(key: string): string | null {
-  const abs = path.resolve(SCREENSHOT_ROOT, key.slice(LOCAL_PREFIX.length));
+  const rel = isLocalKey(key) ? key.slice(LOCAL_PREFIX.length) : key;
+  const abs = path.resolve(SCREENSHOT_ROOT, rel);
   return abs.startsWith(SCREENSHOT_ROOT + path.sep) ? abs : null;
 }
 
-/**
- * 截图落地：优先 S3，S3 不可用（如 RustFS 未启动）时回退磁盘，
- * 否则整个存档创建会失败（sword2 素材走磁盘，但存档截图仍走 S3）
- */
+/** 截图落地：只写磁盘（2026-07-19 起 S3 不再参与写入，见 toOutput 的读取回退） */
 async function persistScreenshot(userId: string, saveId: string, dataUri: string): Promise<string> {
   const base64Data = dataUri.replace(/^data:image\/\w+;base64,/, "");
   const buffer = Buffer.from(base64Data, "base64");
   const key = `saves/${userId}/${saveId}.jpg`;
 
-  try {
-    await uploadFile(key, buffer, "image/jpeg");
-    return key;
-  } catch (e) {
-    logger.warn(`[SaveService] S3 unavailable, screenshot falls back to disk: ${key}`, e);
-    const abs = path.join(SCREENSHOT_ROOT, key);
-    await mkdir(path.dirname(abs), { recursive: true });
-    await writeFile(abs, buffer);
-    return LOCAL_PREFIX + key;
-  }
+  const abs = path.join(SCREENSHOT_ROOT, key);
+  await mkdir(path.dirname(abs), { recursive: true });
+  await writeFile(abs, buffer);
+  return LOCAL_PREFIX + key;
 }
 
-/** 读回磁盘截图为 data URI（前端已支持 data: 开头，无需额外静态路由） */
-async function readLocalScreenshot(key: string): Promise<string | undefined> {
+/**
+ * 读回截图为 data URI：先磁盘，miss 再回退 S3 残留（2026-07-19 之前的存档只在 rustfs 里）。
+ * 一律转 data URI 是因为 bucket 私有，presigned URL 的 host 是内部 endpoint 浏览器解析不了
+ */
+async function readScreenshot(key: string): Promise<string | undefined> {
   const abs = localScreenshotPath(key);
-  if (!abs) return undefined;
+  if (abs) {
+    try {
+      const buffer = await readFile(abs);
+      return `data:image/jpeg;base64,${buffer.toString("base64")}`;
+    } catch {
+      // 磁盘没有，往下回退 S3
+    }
+  }
 
   try {
-    const buffer = await readFile(abs);
+    const buffer = await downloadFile(isLocalKey(key) ? key.slice(LOCAL_PREFIX.length) : key);
     return `data:image/jpeg;base64,${buffer.toString("base64")}`;
   } catch (e) {
-    logger.error("[SaveService] Failed to read local screenshot:", e);
+    logger.error("[SaveService] screenshot unreadable on both disk and S3:", e);
     return undefined;
   }
 }
 
+/** 删截图：磁盘 + S3 残留一起清 */
 async function deleteScreenshot(key: string): Promise<void> {
-  if (!isLocalKey(key)) {
-    await deleteFile(key);
-    return;
-  }
-
   const abs = localScreenshotPath(key);
   if (abs) await rm(abs, { force: true });
+
+  if (!isLocalKey(key)) await deleteFile(key).catch(() => {});
 }
 
 function generateShareCode(): string {
@@ -490,20 +494,10 @@ export class SaveService {
   }
 
   private async toOutput(row: Omit<PrismaSave, "data">) {
-    // screenshot 可能是旧的 base64 data URI、S3 key（私有 bucket），或磁盘回退的 local: key。
-    // 一律读回为 data URI 供前端 <img src>：S3 key 服务端下载转码，local: key 从磁盘读。
-    // 不发 presigned URL——其 host 是内部 endpoint 浏览器解析不了，且 nginx /s3 rewrite 会破坏签名。
+    // screenshot 可能是旧的 base64 data URI、S3 key，或落盘的 local: key；后两者读回成 data URI
     let screenshot = row.screenshot ?? undefined;
-    if (screenshot && isLocalKey(screenshot)) {
-      screenshot = await readLocalScreenshot(screenshot);
-    } else if (screenshot && !isBase64DataUri(screenshot)) {
-      try {
-        const buffer = await downloadFile(screenshot);
-        screenshot = `data:image/jpeg;base64,${buffer.toString("base64")}`;
-      } catch (e) {
-        logger.error("[SaveService] Failed to load screenshot from S3:", e);
-        screenshot = undefined;
-      }
+    if (screenshot && !isBase64DataUri(screenshot)) {
+      screenshot = await readScreenshot(screenshot);
     }
 
     return {

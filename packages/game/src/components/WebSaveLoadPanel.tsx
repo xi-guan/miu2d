@@ -8,7 +8,7 @@
  * - 支持分享功能
  */
 
-import { getS3Url, trpc, useAuth } from "@miu2d/shared";
+import { trpc, useAuth } from "@miu2d/shared";
 import type { SaveSlot } from "@miu2d/types";
 import { HiOutlineXMark } from "react-icons/hi2";
 import { useCallback, useEffect, useState } from "react";
@@ -479,7 +479,7 @@ function SaveSlotCard({
           {save.screenshot ? (
             <img
               src={
-                save.screenshot.startsWith("data:") ? save.screenshot : getS3Url(save.screenshot)
+                save.screenshot
               }
               alt=""
               className="w-full h-full object-cover"
