@@ -152,13 +152,16 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
     }
 
     if (file) {
-      if (file.type !== "file" || !file.storageKey) {
+      if (file.type !== "file") {
         return c.json({ error: "Path is not a file" }, 400);
       }
 
+      // storageKey 为空 = 这条记录只用来撑 dashboard 的资源树，内容在磁盘上，
+      // 直接穿透到下面的磁盘分支。以前这里连同 folder 一起 400，导致「有记录但
+      // 没 storageKey」的文件永远取不到 —— S3 退役后这会是常态
       // 3. 从 S3 获取文件流。失败不直接 500——S3 整个挂掉时曾让 yueying 全线黑屏，
       //    而磁盘上通常有同一份素材，降级读盘远好过不可用
-      if (Date.now() >= s3DownUntil) {
+      if (file.storageKey && Date.now() >= s3DownUntil) {
         try {
           const ifNoneMatch = c.req.header("if-none-match");
           const {
