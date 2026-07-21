@@ -84,7 +84,6 @@ ARG COMMIT_HASH=unknown
 ARG APP_VERSION=0.0.0
 # VITE 环境变量在构建时 bake 进静态产物，必须通过 --build-arg 传入
 ARG VITE_DEMO_RESOURCES_DOMAIN=
-ARG VITE_S3_BASE_URL=/s3/miu2d
 # CACHE_BUST: 每次部署传入不同值以跳过 RUN 层缓存（ARG 变化不自动失效缓存）
 ARG CACHE_BUST=0
 
@@ -93,7 +92,6 @@ WORKDIR /app/packages/web
 RUN COMMIT_HASH=$COMMIT_HASH \
     APP_VERSION=$APP_VERSION \
     VITE_DEMO_RESOURCES_DOMAIN=$VITE_DEMO_RESOURCES_DOMAIN \
-    VITE_S3_BASE_URL=$VITE_S3_BASE_URL \
     CACHE_BUST=$CACHE_BUST \
     bun run build
 
@@ -101,7 +99,7 @@ RUN COMMIT_HASH=$COMMIT_HASH \
 FROM nginx:alpine AS runner
 
 # STATIC_ONLY=true: 纯静态服务，无后端代理（镜像节点，VITE_DEMO_RESOURCES_DOMAIN 已指向外部后端）
-# STATIC_ONLY=false(默认): 包含 /trpc/ /game/ /s3/ 反向代理（完整部署）
+# STATIC_ONLY=false(默认): 包含 /trpc/ /game/ 反向代理（完整部署）
 ARG STATIC_ONLY=false
 COPY packages/web/nginx.conf packages/web/nginx.static.conf /tmp/nginx-conf/
 RUN if [ "$STATIC_ONLY" = "true" ]; then \

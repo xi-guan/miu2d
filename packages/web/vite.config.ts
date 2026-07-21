@@ -68,12 +68,8 @@ function resources404Plugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, envDir, "");
-  // 代理目标：本地默认各自端口，设置环境变量后可代理到远端
-  // 用法：在 .env.local 中设置 BACKEND_URL=https://xxx 和 S3_URL=https://xxx
+  // 代理目标：本地默认后端端口，设置 BACKEND_URL 后可代理到远端
   const backendUrl = env.BACKEND_URL ?? "http://localhost:4100";
-  const s3Url = env.S3_URL ?? "http://localhost:9110";
-  // 仅直连本地 MinIO 时需要去掉 /s3 前缀；远端 nginx 已处理 /s3/ 路由
-  const s3StripPrefix = !env.S3_URL;
 
   return {
   envDir,
@@ -228,13 +224,6 @@ export default defineConfig(({ mode }) => {
       "/trpc": {
         target: backendUrl,
         changeOrigin: true,
-      },
-      // MinIO presigned URL 代理：/s3/* → MinIO
-      // 本地直连 MinIO 时去掉 /s3 前缀；远端 nginx 已处理 /s3/ 路由，不需要 rewrite
-      "/s3": {
-        target: s3Url,
-        changeOrigin: true,
-        ...(s3StripPrefix && { rewrite: (path: string) => path.replace(/^\/s3/, "") }),
       },
       // 代理后端 API 路径到后端
       // 注意：/game/:gameSlug 是前端路由，不代理

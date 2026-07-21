@@ -166,9 +166,9 @@ release-web:
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
     echo "→ building {{web_image}} (amd64 + arm64) @ $hash"
     # VITE_* / STATIC_ONLY are left at their Dockerfile defaults on purpose: verified
-    # against the deployed image (bundle bakes /s3/miu2d, no resource domain = same
-    # origin, nginx.conf not nginx.static.conf). passing them explicitly would only
-    # create a second place to keep in sync
+    # against the deployed image (no resource domain = same origin, nginx.conf not
+    # nginx.static.conf). passing them explicitly would only create a second place
+    # to keep in sync
     docker buildx build --builder miu2d --no-cache --platform linux/amd64,linux/arm64 \
         --file packages/web/Dockerfile --target runner \
         --build-arg COMMIT_HASH=$hash \
