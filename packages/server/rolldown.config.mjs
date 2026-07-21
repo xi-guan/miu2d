@@ -9,7 +9,6 @@ export default {
     main: "src/main.ts",
     "db/migrate": "src/db/migrate.ts",
     "db/rehash-passwords": "src/db/rehash-passwords.ts",
-    "db/patch-null-scene-data": "src/db/patch-null-scene-data.ts",
   },
   output: {
     format: "es",
