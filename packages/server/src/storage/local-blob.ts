@@ -1,9 +1,8 @@
 /**
  * 本地 blob 存储：用户上传（存档截图、游戏 logo）落盘
  *
- * key 与 S3 object key 同构（saves/<userId>/<saveId>.jpg、games/<gameId>/_logo），
- * 所以同一个 key 在两边都认；迁移期读取 disk → S3 回退，写入只落盘，
- * S3 退役后把回退分支删掉即可，key 不用动。
+ * key 结构沿用 S3 时代的 object key（saves/<userId>/<saveId>.jpg、games/<gameId>/_logo），
+ * 所以 S3 退役时把残留对象按同样的路径拷进来就行，DB 里存的 key 一个都不用改。
  */
 
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -25,7 +24,7 @@ export async function putBlob(key: string, body: Buffer): Promise<void> {
   await writeFile(abs, body);
 }
 
-/** 不存在返回 null，让调用方自己决定是回退 S3 还是 404 */
+/** 不存在返回 null，让调用方自己决定怎么兜 */
 export async function getBlob(key: string): Promise<Buffer | null> {
   const abs = blobPath(key);
   if (!abs) return null;

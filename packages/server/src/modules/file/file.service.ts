@@ -1,8 +1,8 @@
 /**
  * 文件系统服务
  *
- * 使用 PostgreSQL 存储文件元数据，S3 存储文件内容
- * 重命名、移动等操作只需修改 PG 记录，无需操作 S3
+ * PostgreSQL 存文件元数据，内容在磁盘上（resources/<slug>/，由内容镜像投放）。
+ * 重命名、移动只改 PG 记录。写操作（上传/替换）随 S3 退役下线，见 uploadDisabled
  */
 
 import type { FileNode } from "@miu2d/types";
@@ -10,8 +10,18 @@ import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
 import type { File as PrismaFile } from "../../db/generated/prisma/client";
 import { getMessage, type Language } from "../../i18n";
-import * as s3 from "../../storage/s3";
 import { verifyGameAccess } from "../../utils/gameAccess";
+
+/**
+ * 写操作曾靠 S3 预签名 URL，rustfs 已下线（2026-07-19）而磁盘上传还没实现。
+ * 明确报错好过让前端去连一个不存在的 endpoint 干等超时
+ */
+function uploadDisabled(language: Language): never {
+  throw new TRPCError({
+    code: "NOT_IMPLEMENTED",
+    message: getMessage(language, "errors.file.uploadDisabled"),
+  });
+}
 
 /**
  * 将数据库记录转换为输出格式
@@ -140,44 +150,18 @@ export class FileService {
   }
 
   /**
-   * 准备上传（获取预签名 URL）
+   * 准备上传（已下线）
    */
   async prepareUpload(
-    gameId: string,
-    parentId: string | null | undefined,
-    name: string,
-    size: number,
-    mimeType: string | undefined,
-    userId: string,
+    _gameId: string,
+    _parentId: string | null | undefined,
+    _name: string,
+    _size: number,
+    _mimeType: string | undefined,
+    _userId: string,
     language: Language
   ): Promise<{ fileId: string; uploadUrl: string; storageKey: string }> {
-    await verifyGameAccess(gameId, userId, language);
-
-    // 检查同名文件/目录
-    await this.checkNameConflict(gameId, parentId ?? null, name, language);
-
-    // 创建文件记录（待确认状态）
-    const file = await db.file.create({
-      data: {
-        gameId,
-        parentId: parentId ?? null,
-        name,
-        type: "file",
-        size: size.toString(),
-        mimeType: mimeType ?? "application/octet-stream",
-      },
-    });
-
-    // 生成 S3 存储键
-    const storageKey = s3.generateStorageKey(gameId, file.id);
-
-    // 更新存储键
-    await db.file.update({ where: { id: file.id }, data: { storageKey } });
-
-    // 获取预签名上传 URL
-    const uploadUrl = await s3.getUploadUrl(storageKey, mimeType);
-
-    return { fileId: file.id, uploadUrl, storageKey };
+    return uploadDisabled(language);
   }
 
   /**
@@ -196,14 +180,6 @@ export class FileService {
 
     await verifyGameAccess(file.gameId, userId, language);
 
-    // 验证 S3 中文件存在
-    if (file.storageKey && !(await s3.fileExists(file.storageKey))) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: getMessage(language, "errors.file.uploadNotComplete"),
-      });
-    }
-
     // 更新 updatedAt
     const updated = await db.file.update({
       where: { id: fileId },
@@ -216,39 +192,11 @@ export class FileService {
 
   /**
    * 获取下载 URL
+   *
+   * 返回公开资源路由的同源相对地址，由 file.routes 从磁盘取。原先返回 S3 预签名
+   * URL，S3 退役后 storageKey 已全部置空，那条路取不到任何东西
    */
   async getDownloadUrl(fileId: string, userId: string, language: Language): Promise<string> {
-    const file = await db.file.findFirst({ where: { id: fileId, deletedAt: null } });
-
-    if (!file) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: getMessage(language, "errors.file.notFound"),
-      });
-    }
-
-    await verifyGameAccess(file.gameId, userId, language);
-
-    if (file.type !== "file" || !file.storageKey) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: getMessage(language, "errors.file.notAFile"),
-      });
-    }
-
-    return s3.getDownloadUrl(file.storageKey);
-  }
-
-  /**
-   * 获取上传 URL（用于更新现有文件内容）
-   */
-  async getUploadUrl(
-    fileId: string,
-    size: number | undefined,
-    mimeType: string | undefined,
-    userId: string,
-    language: Language
-  ): Promise<{ uploadUrl: string; storageKey: string }> {
     const file = await db.file.findFirst({ where: { id: fileId, deletedAt: null } });
 
     if (!file) {
@@ -267,22 +215,34 @@ export class FileService {
       });
     }
 
-    // 生成新的 storageKey，不覆盖原始文件
-    const newStorageKey = s3.generateStorageKey(file.gameId, `${fileId}-${Date.now()}`);
-
-    // 更新文件元数据和新的 storageKey
-    await db.file.update({
-      where: { id: fileId },
-      data: {
-        storageKey: newStorageKey,
-        ...(size !== undefined && { size: size.toString() }),
-        ...(mimeType !== undefined && { mimeType }),
-        updatedAt: new Date(),
-      },
+    const game = await db.game.findFirst({
+      where: { id: file.gameId },
+      select: { slug: true },
     });
 
-    const uploadUrl = await s3.getUploadUrl(newStorageKey, mimeType);
-    return { uploadUrl, storageKey: newStorageKey };
+    if (!game) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: getMessage(language, "errors.file.notFound"),
+      });
+    }
+
+    // buildFilePath 以 / 开头，逐段编码后拼回去（素材名有中文和空格）
+    const encoded = (await this.buildFilePath(fileId)).split("/").map(encodeURIComponent).join("/");
+    return `/game/${game.slug}/resources${encoded}`;
+  }
+
+  /**
+   * 获取上传 URL（已下线）
+   */
+  async getUploadUrl(
+    _fileId: string,
+    _size: number | undefined,
+    _mimeType: string | undefined,
+    _userId: string,
+    language: Language
+  ): Promise<{ uploadUrl: string; storageKey: string }> {
+    return uploadDisabled(language);
   }
 
   /**
@@ -419,7 +379,7 @@ export class FileService {
 
     await verifyGameAccess(file.gameId, userId, language);
 
-    // 软删除：只打标记，不删除数据库记录和 S3 文件
+    // 软删除：只打标记，不删除数据库记录和磁盘文件
     await this.softDeleteRecursive(fileId);
 
     return { id: fileId };
@@ -455,25 +415,6 @@ export class FileService {
     await db.$transaction(async (tx) => {
       await tx.file.updateMany({ where: { id: { in: allIds } }, data: { deletedAt: now } });
     });
-  }
-
-  /**
-   * 递归收集需要删除的 S3 存储键
-   */
-  private async collectStorageKeys(fileId: string, keys: string[]): Promise<void> {
-    const file = await db.file.findFirst({ where: { id: fileId } });
-    if (!file) return;
-
-    if (file.type === "file" && file.storageKey) {
-      keys.push(file.storageKey);
-    } else if (file.type === "folder") {
-      // 获取所有子文件
-      const children = await db.file.findMany({ where: { parentId: fileId, deletedAt: null } });
-
-      for (const child of children) {
-        await this.collectStorageKeys(child.id, keys);
-      }
-    }
   }
 
   /**
@@ -535,20 +476,19 @@ export class FileService {
   }
 
   /**
-   * 批量准备上传（获取预签名 URL）
-   * 一次性处理多个文件，显著减少网络往返
+   * 批量准备上传（已下线）
    */
   async batchPrepareUpload(
-    gameId: string,
-    fileItems: Array<{
+    _gameId: string,
+    _fileItems: Array<{
       clientId: string;
       parentId: string | null | undefined;
       name: string;
       size: number;
       mimeType: string | undefined;
     }>,
-    skipExisting: boolean,
-    userId: string,
+    _skipExisting: boolean,
+    _userId: string,
     language: Language
   ): Promise<
     Array<{
@@ -559,108 +499,7 @@ export class FileService {
       skipped: boolean;
     }>
   > {
-    await verifyGameAccess(gameId, userId, language);
-
-    const results: Array<{
-      clientId: string;
-      fileId: string;
-      uploadUrl: string;
-      storageKey: string;
-      skipped: boolean;
-    }> = [];
-
-    // 按 parentId 分组，批量检查同名冲突
-    const byParent = new Map<string, typeof fileItems>();
-    for (const item of fileItems) {
-      const key = item.parentId ?? "__root__";
-      const group = byParent.get(key) ?? [];
-      group.push(item);
-      byParent.set(key, group);
-    }
-
-    for (const [parentKey, items] of byParent) {
-      const parentId = parentKey === "__root__" ? null : parentKey;
-      const names = items.map((i) => i.name);
-
-      // 批量查询该目录下已存在的文件名
-      const existingFiles = await db.file.findMany({
-        where: parentId
-          ? { gameId, parentId, deletedAt: null, name: { in: names } }
-          : { gameId, parentId: null, deletedAt: null, name: { in: names } },
-        select: { id: true, name: true, storageKey: true },
-      });
-
-      const existingByName = new Map(existingFiles.map((f) => [f.name, f]));
-
-      // 处理已存在的文件
-      const newItems: typeof items = [];
-      for (const item of items) {
-        const existing = existingByName.get(item.name);
-
-        if (existing) {
-          if (skipExisting) {
-            results.push({
-              clientId: item.clientId,
-              fileId: existing.id,
-              uploadUrl: "",
-              storageKey: existing.storageKey ?? "",
-              skipped: true,
-            });
-            continue;
-          }
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: getMessage(language, "errors.file.nameConflict"),
-          });
-        }
-        newItems.push(item);
-      }
-
-      if (newItems.length === 0) continue;
-
-      // 预先生成 UUID 和 storageKey，避免 INSERT 后再 UPDATE
-      const newFileRows = newItems.map((item) => {
-        const id = crypto.randomUUID();
-        const storageKey = s3.generateStorageKey(gameId, id);
-        return {
-          id,
-          storageKey,
-          clientId: item.clientId,
-          mimeType: item.mimeType,
-          row: {
-            id,
-            gameId,
-            parentId: parentId,
-            name: item.name,
-            type: "file" as const,
-            size: item.size.toString(),
-            mimeType: item.mimeType ?? "application/octet-stream",
-            storageKey,
-          },
-        };
-      });
-
-      // 一次批量 INSERT
-      await db.file.createMany({ data: newFileRows.map((f) => f.row) });
-
-      // 并行获取所有 presigned URL
-      const uploadUrls = await Promise.all(
-        newFileRows.map((f) => s3.getUploadUrl(f.storageKey, f.mimeType))
-      );
-
-      for (let i = 0; i < newFileRows.length; i++) {
-        const f = newFileRows[i];
-        results.push({
-          clientId: f.clientId,
-          fileId: f.id,
-          uploadUrl: uploadUrls[i],
-          storageKey: f.storageKey,
-          skipped: false,
-        });
-      }
-    }
-
-    return results;
+    return uploadDisabled(language);
   }
 
   /**
@@ -683,16 +522,7 @@ export class FileService {
       await verifyGameAccess(gid, userId, language);
     }
 
-    // 批量验证 S3 中文件存在（并行检查）
-    const validFileIds: string[] = [];
-    const checks = fileRecords.map(async (file) => {
-      if (file.storageKey && (await s3.fileExists(file.storageKey))) {
-        validFileIds.push(file.id);
-      }
-    });
-    await Promise.all(checks);
-
-    if (validFileIds.length === 0) return 0;
+    const validFileIds = fileRecords.map((f) => f.id);
 
     // 批量更新 updatedAt
     await db.file.updateMany({

@@ -39,7 +39,7 @@ export const zh = {
         parentNotFound: "目标目录不存在",
         parentNotFolder: "目标不是目录",
         cannotMoveToDescendant: "无法将目录移动到其子目录中",
-        uploadNotComplete: "文件上传未完成",
+        uploadDisabled: "素材上传暂不可用（存储改造中）",
         notAFile: "该项不是文件",
       },
       magic: {

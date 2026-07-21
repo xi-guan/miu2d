@@ -45,18 +45,11 @@ export const env = {
   // ---------- Database ----------
   databaseUrl: str("DATABASE_URL"),
 
-  // ---------- S3 / MinIO ----------
-  s3Endpoint: str("S3_ENDPOINT", "http://localhost:9110"),
-  s3Region: str("S3_REGION", "us-east-1"),
-  s3AccessKey: str("MINIO_ROOT_USER", "minio"),
-  s3SecretKey: str("MINIO_ROOT_PASSWORD", "minio123"),
-  s3Bucket: str("MINIO_BUCKET", "miu2d"),
-  /** 客户端可访问的 S3 endpoint（开发走代理，生产走 CDN） */
-  s3PublicEndpoint: str("S3_PUBLIC_ENDPOINT", "/s3"),
+  // ---------- 存储 ----------
   /**
-   * 用户上传落盘根目录（相对 cwd，即 packages/server）：存档截图 + 游戏 logo，
-   * 目录内 key 结构与 S3 一致。变量名沿用 SAVE_SCREENSHOT_DIR —— NAS 上按这个名字
-   * bind mount 着，改名要同步改部署，不值得
+   * 用户上传落盘根目录（相对 cwd，即 packages/server）：存档截图 + 游戏 logo。
+   * 变量名沿用 SAVE_SCREENSHOT_DIR —— NAS 上按这个名字 bind mount 着，
+   * 改名要同步改部署，不值得
    */
   uploadDir: str("SAVE_SCREENSHOT_DIR", "../../.data/save-screenshots"),
   /** 磁盘资源根目录（相对 cwd）；docker 把 resources 挂到 ../../resources = /app/resources */

@@ -11,7 +11,6 @@ import { TRPCError } from "@trpc/server";
 import { db } from "../../db/client";
 import type { Prisma, Save as PrismaSave } from "../../db/generated/prisma/client";
 import { env } from "../../env";
-import { deleteFile, downloadFile } from "../../storage/s3";
 import { verifyGameOwnerAccess } from "../../utils/gameAccess";
 import { Logger } from "../../utils/logger.js";
 
@@ -31,8 +30,8 @@ function isLocalKey(key: string): boolean {
 
 /**
  * key → 磁盘绝对路径；越界返回 null（screenshot 允许客户端直传字符串，需防路径遍历）。
- * 磁盘布局与 S3 key 同构，所以带不带 local: 前缀都能落到同一个位置 ——
- * 旧存档的裸 key 等 S3 残留拷进来后无需改 DB 就能直接读
+ * 磁盘布局沿用 S3 时代的 key，所以带不带 local: 前缀都落到同一个位置 ——
+ * 残留对象按原路径拷进来后，旧存档那些裸 key 无需改 DB 就能直接读
  */
 function localScreenshotPath(key: string): string | null {
   const rel = isLocalKey(key) ? key.slice(LOCAL_PREFIX.length) : key;
@@ -40,7 +39,7 @@ function localScreenshotPath(key: string): string | null {
   return abs.startsWith(SCREENSHOT_ROOT + path.sep) ? abs : null;
 }
 
-/** 截图落地：只写磁盘（2026-07-19 起 S3 不再参与写入，见 toOutput 的读取回退） */
+/** 截图落地：只写磁盘（2026-07-19 起 S3 不再参与） */
 async function persistScreenshot(userId: string, saveId: string, dataUri: string): Promise<string> {
   const base64Data = dataUri.replace(/^data:image\/\w+;base64,/, "");
   const buffer = Buffer.from(base64Data, "base64");
@@ -52,36 +51,23 @@ async function persistScreenshot(userId: string, saveId: string, dataUri: string
   return LOCAL_PREFIX + key;
 }
 
-/**
- * 读回截图为 data URI：先磁盘，miss 再回退 S3 残留（2026-07-19 之前的存档只在 rustfs 里）。
- * 一律转 data URI 是因为 bucket 私有，presigned URL 的 host 是内部 endpoint 浏览器解析不了
- */
+/** 读回截图为 data URI（前端 img src 直接用，早年 presigned URL 的内部 host 浏览器解析不了） */
 async function readScreenshot(key: string): Promise<string | undefined> {
   const abs = localScreenshotPath(key);
-  if (abs) {
-    try {
-      const buffer = await readFile(abs);
-      return `data:image/jpeg;base64,${buffer.toString("base64")}`;
-    } catch {
-      // 磁盘没有，往下回退 S3
-    }
-  }
+  if (!abs) return undefined;
 
   try {
-    const buffer = await downloadFile(isLocalKey(key) ? key.slice(LOCAL_PREFIX.length) : key);
+    const buffer = await readFile(abs);
     return `data:image/jpeg;base64,${buffer.toString("base64")}`;
   } catch (e) {
-    logger.error("[SaveService] screenshot unreadable on both disk and S3:", e);
+    logger.error("[SaveService] screenshot unreadable:", e);
     return undefined;
   }
 }
 
-/** 删截图：磁盘 + S3 残留一起清 */
 async function deleteScreenshot(key: string): Promise<void> {
   const abs = localScreenshotPath(key);
   if (abs) await rm(abs, { force: true });
-
-  if (!isLocalKey(key)) await deleteFile(key).catch(() => {});
 }
 
 function generateShareCode(): string {
@@ -151,7 +137,7 @@ export class SaveService {
   ) {
     const game = await this.resolveGame(input.gameSlug);
 
-    // Pre-determine saveId so it can be used as the S3 key
+    // pre-determine saveId so it can be used in the screenshot key
     const targetSaveId = input.saveId ?? randomUUID();
 
     // 覆盖已有存档时先校验归属
@@ -170,7 +156,7 @@ export class SaveService {
       }
     }
 
-    // 处理截图：base64 上传 S3（不可用则落盘），只存 key
+    // 处理截图：base64 落盘，只存 key
     let screenshotKey: string | null = null;
     if (input.screenshot) {
       if (isBase64DataUri(input.screenshot)) {

@@ -41,7 +41,7 @@ export const en: TranslationSchema = {
         parentNotFound: "Target folder not found",
         parentNotFolder: "Target is not a folder",
         cannotMoveToDescendant: "Cannot move a folder into its own subfolder",
-        uploadNotComplete: "File upload not complete",
+        uploadDisabled: "Asset upload is unavailable (storage rework in progress)",
         notAFile: "This item is not a file",
       },
       magic: {

@@ -15,7 +15,6 @@ import { db } from "../db/client";
 import type { Prisma } from "../db/generated/prisma/client";
 import { gameConfigService } from "../modules/gameConfig/gameConfig.service";
 import { deleteBlob, getBlob, putBlob } from "../storage/local-blob";
-import * as s3 from "../storage/s3";
 import { Logger } from "../utils/logger";
 import { resolveUserId } from "../utils/session";
 
@@ -31,7 +30,7 @@ const LOGO_SIZES = [512, 192, 128] as const;
 const MIN_LOGO_SIZE = 256;
 type LogoSize = (typeof LOGO_SIZES)[number];
 
-/** Logo 在 S3 中的存储 key（原图） */
+/** Logo 原图的存储 key */
 function logoStorageKey(gameId: string): string {
   return `games/${gameId}/_logo`;
 }
@@ -46,25 +45,8 @@ function allLogoKeys(gameId: string): string[] {
   return [logoStorageKey(gameId), ...LOGO_SIZES.map((size) => logoSizedKey(gameId, size))];
 }
 
-/** 删 logo：本地盘 + S3 残留一起清，S3 那份删失败只留孤儿对象，不影响一致性 */
 async function removeLogos(gameId: string): Promise<void> {
-  await Promise.all(
-    allLogoKeys(gameId).flatMap((k) => [deleteBlob(k), s3.deleteFile(k).catch(() => {})])
-  );
-}
-
-/**
- * 读 logo：先本地盘，miss 再回退 S3 —— 2026-07-19 之前上传的 logo 还只在 rustfs 里。
- * S3 退役前把残留对象拷进上传目录，届时这里的回退分支可以整块删掉
- */
-async function readLogo(key: string): Promise<Buffer | null> {
-  const local = await getBlob(key);
-  if (local) return local;
-  try {
-    return await s3.downloadFile(key);
-  } catch {
-    return null;
-  }
+  await Promise.all(allLogoKeys(gameId).map((k) => deleteBlob(k)));
 }
 
 /**
@@ -120,7 +102,7 @@ gameConfigRoutes.get(":gameSlug/api/manifest", async (c) => {
 
     const startUrl = `/game/${gameSlug}/`;
 
-    // 通过 gameConfig 判断是否有自定义 logo（避免额外 S3 请求）
+    // 通过 gameConfig 判断是否有自定义 logo（省一次读盘）
     const gameConfig = await gameConfigService.getPublicBySlug(gameSlug);
     const hasLogo = Boolean(gameConfig?.logoUrl?.startsWith("games/"));
 
@@ -187,7 +169,7 @@ gameConfigRoutes.get(":gameSlug/api/manifest", async (c) => {
 
 /**
  * 获取游戏 Logo 指定尺寸变体（128/192/512）
- * dashboard 和游戏前端都走这条；bucket 是私有的，裸 /s3 URL 会 403
+ * dashboard 和游戏前端都走这条
  */
 gameConfigRoutes.get(":gameSlug/api/logo/:size", async (c) => {
   try {
@@ -209,7 +191,7 @@ gameConfigRoutes.get(":gameSlug/api/logo/:size", async (c) => {
     }
 
     // 变体固定是 generateLogoVariants 出的 png；logo 最大 5MB，整块读比流省事
-    const buf = await readLogo(logoSizedKey(game.id, size));
+    const buf = await getBlob(logoSizedKey(game.id, size));
     if (!buf) return c.json({ error: "Logo not found" }, 404);
 
     c.header("Content-Type", "image/png");
@@ -217,7 +199,7 @@ gameConfigRoutes.get(":gameSlug/api/logo/:size", async (c) => {
     // 重包一层：node 的 Buffer<ArrayBufferLike> 不满足 hono 要的 Uint8Array<ArrayBuffer>
     return c.body(new Uint8Array(buf));
   } catch (error) {
-    // 「没上传过」现在由 readLogo 返回 null 覆盖，走到这里的都是真异常
+    // 「没上传过」由 getBlob 返回 null 覆盖，走到这里的都是真异常
     logger.error("[getLogoSized] Error:", error);
     return c.json({ error: "Logo not found" }, 404);
   }
@@ -367,7 +349,7 @@ gameConfigRoutes.delete(":gameSlug/api/logo", async (c) => {
       return c.json({ error: "No access" }, 403);
     }
 
-    // 先清除 DB 中的 logoUrl，再删除 S3 文件。
+    // 先清除 DB 中的 logoUrl，再删磁盘文件
     const existing = await db.gameConfig.findFirst({ where: { gameId: game.id } });
 
     if (existing) {

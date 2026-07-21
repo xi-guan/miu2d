@@ -4,17 +4,15 @@
  * 提供 /game/:gameSlug/resources/* 路径的公开访问
  * 用于游戏客户端直接加载资源文件
  *
- * 磁盘回退：DB 无文件记录、或 S3 取用失败时，从本地 resources/ 目录读取
+ * 内容一律读本地 resources/<slug>/（由内容镜像投放）；File 表只用来撑 dashboard
+ * 的资源树，取用不依赖它，所以 sword1/sword2 没有记录也照样能取
  */
 
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { db } from "../db/client";
 import { env } from "../env";
-import * as s3 from "../storage/s3";
-import { resolveFilePath } from "../utils/file";
 import { Logger } from "../utils/logger";
 
 const logger = new Logger("FileRoutes");
@@ -25,15 +23,8 @@ const RESOURCE_ROOT = path.resolve(env.resourceRoot);
 // dev keeps no-cache so re-converted local assets show up immediately; prod assets change only via re-import
 const CACHE_CONTROL = env.isProd ? `public, max-age=${env.assetCacheMaxAge}` : "no-cache";
 
-// every asset request used to cost a slug lookup + a recursive CTE; short TTL keeps fresh imports visible
+// 大小写兜底的结果；没有它每次未命中都要逐层 readdir。短 TTL 让重新投放的素材可见
 const CACHE_TTL_MS = 60_000;
-const gameIdCache = new Map<string, { v: string | null; exp: number }>();
-const fileCache = new Map<string, { v: Awaited<ReturnType<typeof resolveFilePath>>; exp: number }>();
-
-// after an s3 failure skip it for a cooldown, else every request eats a dead connect
-const S3_COOLDOWN_MS = 60_000;
-let s3DownUntil = 0;
-// 大小写兜底的结果；没有它每次未命中都要逐层 readdir
 const diskPathCache = new Map<string, { v: string | null; exp: number }>();
 
 function cacheGet<T>(map: Map<string, { v: T; exp: number }>, key: string): { v: T } | undefined {
@@ -125,87 +116,9 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
 
     logger.debug(`[getResource] gameSlug=${gameSlug}, filePath=${filePath}`);
 
-    // 1. 根据 slug 获取游戏
-    let gameId: string | null;
-    const gameHit = cacheGet(gameIdCache, gameSlug);
-    if (gameHit) {
-      gameId = gameHit.v;
-    } else {
-      const game = await db.game.findFirst({ where: { slug: gameSlug }, select: { id: true } });
-      gameId = game?.id ?? null;
-      cacheSet(gameIdCache, gameSlug, gameId);
-    }
-
-    if (!gameId) {
-      return c.json({ error: "Game not found" }, 404);
-    }
-
-    // 2. 解析路径，找到目标文件
+    // 读本地 resources/<gameSlug>/。以前这里先查 DB 拿 storageKey 再走 S3，
+    // 每个素材请求要付一次 slug 查询 + 一次递归 CTE；S3 退役后那条路只剩开销
     const pathSegments = filePath.split("/").filter(Boolean);
-    let file: Awaited<ReturnType<typeof resolveFilePath>>;
-    const fileHit = cacheGet(fileCache, `${gameId}:${filePath}`);
-    if (fileHit) {
-      file = fileHit.v;
-    } else {
-      file = await resolveFilePath(gameId, pathSegments);
-      cacheSet(fileCache, `${gameId}:${filePath}`, file);
-    }
-
-    if (file) {
-      if (file.type !== "file") {
-        return c.json({ error: "Path is not a file" }, 400);
-      }
-
-      // storageKey 为空 = 这条记录只用来撑 dashboard 的资源树，内容在磁盘上，
-      // 直接穿透到下面的磁盘分支。以前这里连同 folder 一起 400，导致「有记录但
-      // 没 storageKey」的文件永远取不到 —— S3 退役后这会是常态
-      // 3. 从 S3 获取文件流。失败不直接 500——S3 整个挂掉时曾让 yueying 全线黑屏，
-      //    而磁盘上通常有同一份素材，降级读盘远好过不可用
-      if (file.storageKey && Date.now() >= s3DownUntil) {
-        try {
-          const ifNoneMatch = c.req.header("if-none-match");
-          const {
-            stream: fileStream,
-            contentType,
-            contentLength,
-            etag,
-            notModified,
-          } = await s3.getFileStream(file.storageKey, ifNoneMatch);
-
-          if (notModified) {
-            c.header("Cache-Control", CACHE_CONTROL);
-            if (etag) c.header("ETag", etag);
-            return c.body(null, 304);
-          }
-
-          // 4. 设置响应头
-          c.header("Content-Type", file.mimeType || contentType || "application/octet-stream");
-          if (contentLength !== undefined) {
-            c.header("Content-Length", String(contentLength));
-          }
-          c.header("Cache-Control", CACHE_CONTROL);
-          if (etag) c.header("ETag", etag);
-
-          // 5. 流式传输
-          return stream(c, async (s) => {
-            for await (const chunk of fileStream) {
-              await s.write(chunk as Uint8Array);
-            }
-          });
-        } catch (err) {
-          // 响应头在 getFileStream 成功之后才设，所以这里穿透到磁盘分支是安全的
-          s3DownUntil = Date.now() + S3_COOLDOWN_MS;
-          logger.warn(
-            `[getResource] s3 failed for ${file.storageKey}, falling back to disk: ${
-              err instanceof Error ? err.message : String(err)
-            }`
-          );
-        }
-      }
-    }
-
-    // 6. 磁盘回退：读本地 resources/<gameSlug>/
-    //    两种情况会走到这里——DB 没有该文件记录（sword1/sword2），或上面的 S3 取用失败
     const relativePath = pathSegments.join("/");
     const gameResourceRoot = path.join(RESOURCE_ROOT, gameSlug);
 
@@ -225,7 +138,10 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
     for (const rel of candidates) {
       const p = path.join(gameResourceRoot, rel);
       try {
-        stat = await fs.promises.stat(p);
+        const s = await fs.promises.stat(p);
+        // 目录不可取用；以前靠 DB 记录的 type 挡掉，现在不查库了得自己判
+        if (!s.isFile()) continue;
+        stat = s;
         localPath = p;
         break;
       } catch {
@@ -242,7 +158,9 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
         if (!hit) cacheSet(diskPathCache, key, resolved);
         if (!resolved) continue;
         try {
-          stat = await fs.promises.stat(resolved);
+          const s = await fs.promises.stat(resolved);
+          if (!s.isFile()) continue;
+          stat = s;
           localPath = resolved;
           break;
         } catch {
@@ -255,8 +173,7 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
       return c.json({ error: "File not found" }, 404);
     }
 
-    // 磁盘回退也要支持协商缓存: 否则 dev 的 no-cache 下浏览器每次全量重下,
-    // 跑图时 tile/精灵反复整包传输 (S3 路径有 ETag/304, 两路径行为须对称)
+    // 协商缓存: 否则 dev 的 no-cache 下浏览器每次全量重下, 跑图时 tile/精灵反复整包传输
     const etag = `W/"${stat.size}-${Math.floor(stat.mtimeMs)}"`;
     if (c.req.header("if-none-match") === etag) {
       c.header("Cache-Control", CACHE_CONTROL);
@@ -269,9 +186,9 @@ fileRoutes.get(":gameSlug/resources/*", async (c) => {
     c.header("ETag", etag);
     c.header("Content-Length", String(stat.size));
 
-    // 与 S3 分支对称走 hono stream(): await write 天然 backpressure (慢客户端不会把
-    // 整个文件积压进内存), onAbort 断连时销毁 fileStream 释放 fd。取代原先手写的
-    // wrapper——它无 backpressure, 且靠 closed 标志硬防 enqueue-after-close 崩进程
+    // hono stream(): await write 天然 backpressure (慢客户端不会把整个文件积压进内存),
+    // onAbort 断连时销毁 fileStream 释放 fd。取代原先手写的 wrapper——它无 backpressure,
+    // 且靠 closed 标志硬防 enqueue-after-close 崩进程
     const fileStream = fs.createReadStream(localPath);
     return stream(c, async (s) => {
       s.onAbort(() => {
