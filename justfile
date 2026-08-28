@@ -1,8 +1,8 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# every push recipe logs in from $GITEA_REGISTRY_TOKEN and logs out on exit rather than
-# relying on a persisted `docker login`: the keychain holds one credential per host for the
-# whole machine, so a login from any other project silently replaces this one
+# `just release` writes $GITEA_REGISTRY_TOKEN into a throwaway DOCKER_CONFIG instead of
+# running `docker login`: on macOS the keychain store can only add, never replace, so an
+# entry left by any other project kills the login with -25299 and `docker logout` can't clear it
 server_image := "gitea.susie.se/coaster/miu2d-server"
 web_image := "gitea.susie.se/coaster/miu2d-web"
 game_image := "gitea.susie.se/coaster/miu2d-game-"
@@ -134,18 +134,63 @@ convert-verify:
     echo "→ verifying mpc/msf lossless"
     cargo run --release --manifest-path packages/converter/Cargo.toml --bin verify_mpc -- resources/mpc
 
-# build server image (amd64 + arm64), push manifest to gitea, print NAS deploy commands
-release:
+# 构建并推送镜像 — just release <all|server|web|game-yueying|game-sword1|game-sword2>
+release target="":
     #!/usr/bin/env bash
     set -euo pipefail
-    hash=$(git rev-parse --short HEAD)
+    t="{{target}}"
+    case "$t" in
+        server|web|game-yueying|game-sword1|game-sword2) ;;
+        all)
+            # five images, and the server one is --no-cache dual-arch — a mistyped target costs 10+ minutes
+            read -r -p "构建并推送全部 5 个镜像? [y/N] " ans
+            [[ "$ans" == [yY] ]] || { echo "aborted"; exit 0; }
+            ;;
+        "")
+            # 空参数不默认建 server: 改成带参数前 `just release` 就是 server, 静默沿用会让肌肉记忆推错镜像
+            echo "用法: just release <target>"
+            echo "  all             5 个镜像全推 (会先问一次)"
+            echo "  server          {{server_image}}"
+            echo "  web             {{web_image}} (含 dashboard)"
+            echo "  game-yueying    {{game_image}}yueying — 素材 + DB 种子"
+            echo "  game-sword1     {{game_image}}sword1"
+            echo "  game-sword2     {{game_image}}sword2"
+            exit 1
+            ;;
+        *) echo "✗ 未知目标 $t — 跑 just release 看可选项"; exit 1 ;;
+    esac
     # dirty builds once poisoned the buildx cache with a broken bundle layer — refuse outright
     [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
     : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
-    printf '%s' "$GITEA_REGISTRY_TOKEN" | docker login gitea.susie.se -u dcsp --password-stdin
-    trap 'docker logout gitea.susie.se >/dev/null 2>&1 || true' EXIT
+    export BUILDX_CONFIG="${BUILDX_CONFIG:-$HOME/.docker/buildx}"
+    export DOCKER_CONFIG="$(mktemp -d)"
+    trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+    # cli plugins are looked up under DOCKER_CONFIG too, so an empty one loses `docker buildx`
+    ln -s "$HOME/.docker/cli-plugins" "$DOCKER_CONFIG/cli-plugins"
+    auth=$(printf 'dcsp:%s' "$GITEA_REGISTRY_TOKEN" | base64 | tr -d '\n')
+    printf '{"auths":{"gitea.susie.se":{"auth":"%s"}}}' "$auth" > "$DOCKER_CONFIG/config.json"
     # multi-arch manifest needs a docker-container builder; the classic docker driver can't export one
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
+    # the sub-recipes inherit DOCKER_CONFIG through the environment, so credentials are written once
+    case "$t" in
+        all)
+            just _release-server
+            just _release-web
+            for s in yueying sword1 sword2; do just _release-game "$s"; done
+            ;;
+        server)  just _release-server ;;
+        web)     just _release-web ;;
+        game-*)  just _release-game "${t#game-}" ;;
+    esac
+    echo ""
+    echo "── 上线: NAS (192.168.1.63) 的 /volume1/docker/miu2d 下 ──"
+    echo "  sudo docker compose pull && sudo docker compose up -d"
+
+# 私有 — 凭据、buildx builder、干净工作区的检查都由 `just release` 备好
+_release-server:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    hash=$(git rev-parse --short HEAD)
     echo "→ building {{server_image}} (amd64 + arm64) @ $hash"
     # --no-cache: a warm cache twice produced a broken image (poisoned bundle, then
     # rolldown mis-resolving @miu2d/types → shared/locales). the workspace-symlink
@@ -155,24 +200,15 @@ release:
         --tag {{server_image}}:$hash --tag {{server_image}}:latest \
         --push .
     echo "✓ pushed {{server_image}}:$hash (amd64 + arm64)"
-    echo ""
-    echo "── local (arm64): docker pull {{server_image}}:latest ──"
-    echo "── on NAS (192.168.1.63), in the miu2d compose dir ──"
-    echo "  sudo docker compose pull && sudo docker compose up -d"
-    echo "  sudo docker ps | grep miu2d-server        # Up, not Restarting"
+    echo "  验证: 本机 arm64 可 docker pull {{server_image}}:latest"
+    echo "  验证: sudo docker ps | grep miu2d-server        # Up, not Restarting"
     # 别用 /trpc/auth.me —— 没有这个 procedure，恒 404，分不出好坏。这条穿透 nginx→server→db
-    echo "  curl -s -o /dev/null -w '%{http_code}\\n' http://localhost:8090/game/yueying/api/config   # 200"
+    echo "  验证: curl -s -o /dev/null -w '%{http_code}\\n' http://localhost:8090/game/yueying/api/config   # 200"
 
-# build web image (amd64 + arm64), push manifest to gitea
-release-web:
+_release-web:
     #!/usr/bin/env bash
     set -euo pipefail
     hash=$(git rev-parse --short HEAD)
-    [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
-    : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
-    printf '%s' "$GITEA_REGISTRY_TOKEN" | docker login gitea.susie.se -u dcsp --password-stdin
-    trap 'docker logout gitea.susie.se >/dev/null 2>&1 || true' EXIT
-    docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
     echo "→ building {{web_image}} (amd64 + arm64) @ $hash"
     # VITE_* / STATIC_ONLY are left at their Dockerfile defaults on purpose: verified
     # against the deployed image (no resource domain = same origin, nginx.conf not
@@ -184,21 +220,12 @@ release-web:
         --tag {{web_image}}:$hash --tag {{web_image}}:latest \
         --push .
     echo "✓ pushed {{web_image}}:$hash (amd64 + arm64)"
-    echo ""
-    echo "── on NAS (192.168.1.63), in the miu2d compose dir ──"
-    echo "  sudo docker compose pull && sudo docker compose up -d"
 
-# build a game content image (assets + db seed) and push it to gitea
-release-game slug:
+_release-game slug:
     #!/usr/bin/env bash
     set -euo pipefail
     hash=$(git rev-parse --short HEAD)
-    [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
     [ -d "resources/{{slug}}" ] || { echo "✗ resources/{{slug}} not found"; exit 1; }
-    # before the seed export, so a missing token costs nothing
-    : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
-    printf '%s' "$GITEA_REGISTRY_TOKEN" | docker login gitea.susie.se -u dcsp --password-stdin
-    trap 'docker logout gitea.susie.se >/dev/null 2>&1 || true' EXIT
     echo "→ exporting {{slug}} seed from local db (needs: just db up)"
     (cd packages/server && bunx tsx --tsconfig tsconfig.dev.json scripts/export-game-seed.ts {{slug}})
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
@@ -214,8 +241,6 @@ release-game slug:
         --tag {{game_image}}{{slug}}:$hash --tag {{game_image}}{{slug}}:latest \
         --push docker/
     echo "✓ pushed {{game_image}}{{slug}}:$hash (amd64 + arm64)"
-    echo ""
-    echo "── on NAS (192.168.1.63), in the miu2d compose dir ──"
-    echo "  sudo docker compose pull && sudo docker compose up -d"
-    echo "  sudo docker logs miu2d-game-{{slug}}     # assets installed / up-to-date"
-    echo "  sudo docker logs miu2d-server | grep seed"
+    echo "  验证: sudo docker logs miu2d-game-{{slug}}     # assets installed / up-to-date"
+    # 种子只填空库(seed-games.ts: already present, skipped), 库里已有该 slug 就不会被覆盖
+    echo "  验证: sudo docker logs miu2d-server | grep seed"
