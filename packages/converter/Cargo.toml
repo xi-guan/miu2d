@@ -36,6 +36,10 @@ path = "src/bin/unpack_pak.rs"
 name = "brute-hash"
 path = "src/bin/brute_hash.rs"
 
+[[bin]]
+name = "export-png"
+path = "src/bin/export_png.rs"
+
 [dependencies]
 walkdir = "2"
 rayon = "1.10"
