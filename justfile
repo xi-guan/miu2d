@@ -138,6 +138,14 @@ convert-verify:
 release *targets:
     #!/usr/bin/env bash
     set -euo pipefail
+    # 先于菜单: 让人挑完目标再被拒绝, 等于白挑一次
+    # dirty builds once poisoned the buildx cache with a broken bundle layer — refuse outright
+    [ -z "$(git status --porcelain)" ] || {
+        echo "✗ uncommitted changes — commit first"
+        git status --short
+        exit 1
+    }
+    : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
     menu=(
         "all             5 个镜像全推"
         "server          {{server_image}}"
@@ -178,9 +186,6 @@ release *targets:
             *) echo "✗ 未知目标 $x — 跑 just release 看可选项"; exit 1 ;;
         esac
     done
-    # dirty builds once poisoned the buildx cache with a broken bundle layer — refuse outright
-    [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
-    : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
     export BUILDX_CONFIG="${BUILDX_CONFIG:-$HOME/.docker/buildx}"
     export DOCKER_CONFIG="$(mktemp -d)"
     trap 'rm -rf "$DOCKER_CONFIG"' EXIT

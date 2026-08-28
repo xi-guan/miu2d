@@ -45,3 +45,5 @@ vfx-demo
 /maplogos-512/
 .codegraph/
 games-raw
+# tldraw 本地画布草稿, 内容是 zip 包着的 sqlite, 不适合进 git
+*.tldraw
