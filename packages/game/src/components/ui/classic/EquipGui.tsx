@@ -10,9 +10,10 @@ import type { UIGoodData } from "@miu2d/engine/gui/ui-types";
 import { useDevice } from "@miu2d/shared";
 import type React from "react";
 import { useCallback, useMemo } from "react";
-import type { TouchDragData } from "../../../contexts";
+import { type TouchDragData, useGameUIContext } from "../../../contexts";
 import { useTouchDragSource, useTouchDropTarget } from "../../../hooks";
 import { useAsfImage } from "./hooks";
+import { resolvePanelPosition } from "./panelAlign";
 import type { PlayerStats } from "./StateGui";
 import { useEquipGuiConfig, useStateGuiConfig } from "./useUISettings";
 
@@ -283,6 +284,7 @@ export const EquipGui: React.FC<EquipGuiProps> = ({
   onTouchDrop,
   overlayStats,
 }) => {
+  const { screenHeight } = useGameUIContext();
   // Load config from UI_Settings.ini
   const config = useEquipGuiConfig();
   // 整合模式：加载 State 配置（即使不用 overlayStats，也须始终在顶层调用 Hook）
@@ -298,16 +300,27 @@ export const EquipGui: React.FC<EquipGuiProps> = ({
     if (!config) return null;
     const panelWidth = panelImage.width || 300;
     const panelHeight = panelImage.height || 400;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      {
+        left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
+        top: config.panel.topAdjust,
+      }
+    );
 
     return {
       position: "absolute" as const,
-      left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   // Check if drag can be dropped in slot
   const canDropInSlot = useCallback(

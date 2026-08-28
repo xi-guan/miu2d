@@ -9,6 +9,7 @@
  */
 
 import type {
+  PanelAlign,
   ThemeBar,
   ThemeBottom,
   ThemeBottomState,
@@ -70,6 +71,24 @@ function parseColor(colorStr: string, defaultColor = "rgba(0,0,0,1)"): string {
 // INI → 紧凑 Theme 子类型转换器
 // ============================================
 
+/** window.ini 的 align= 词表 → 屏幕锚点; alclient 由 title 的 canvas 单独处理, 这里忽略 */
+const ALIGN_WORDS: Record<string, PanelAlign> = {
+  alltcorner: "lt",
+  ltcorner: "lt",
+  alrtcorner: "rt",
+  rtcorner: "rt",
+  allbcorner: "lb",
+  lbcorner: "lb",
+  alrbcorner: "rb",
+  rbcorner: "rb",
+  alcenter: "center",
+  albottomcenter: "bc",
+};
+
+function parseAlign(raw: string | undefined): PanelAlign | undefined {
+  return raw ? ALIGN_WORDS[raw.trim().toLowerCase()] : undefined;
+}
+
 function panelToTheme(s: IniSection, defaultImage: string): ThemePanel {
   const image = normalizeImagePath(s.Image || defaultImage);
   const leftAdj = int2(s.LeftAdjust, 0);
@@ -77,6 +96,7 @@ function panelToTheme(s: IniSection, defaultImage: string): ThemePanel {
   const rawWidth = int2(s.Width, 0);
   const rawHeight = int2(s.Height, 0);
   const rawAnchor = s.Anchor?.trim();
+  const rawAlign = parseAlign(s.Align);
   const rawOverlay = s.OverlayImage?.trim();
   const rawOverlayLeft = int2(s.OverlayLeft, 0);
   const rawOverlayTop = int2(s.OverlayTop, 0);
@@ -88,6 +108,7 @@ function panelToTheme(s: IniSection, defaultImage: string): ThemePanel {
     rawWidth > 0 ||
     rawHeight > 0 ||
     rawAnchor === "Bottom" ||
+    rawAlign ||
     rawOverlay;
 
   if (!hasExtras) return image;
@@ -102,6 +123,7 @@ function panelToTheme(s: IniSection, defaultImage: string): ThemePanel {
   }
   if (rawWidth > 0 || rawHeight > 0) result.size = [rawWidth, rawHeight];
   if (rawAnchor === "Bottom") result.anchor = "bottom";
+  if (rawAlign) result.align = rawAlign;
   return result;
 }
 
@@ -296,6 +318,9 @@ function convertTitle(settings: IniSettings): ThemeTitle | undefined {
       exit: buttonToTheme(getSection(settings, "Title_Btn_Exit"), btnD),
     },
   };
+  const cw = int2(sec.Width, 0);
+  const ch = int2(sec.Height, 0);
+  if (cw > 0 && ch > 0) result.canvas = [cw, ch];
   const la = int2(sec.LeftAdjust, 0);
   const ta = int2(sec.TopAdjust, 0);
   if (la !== 0 || ta !== 0) result.offset = [la, ta];

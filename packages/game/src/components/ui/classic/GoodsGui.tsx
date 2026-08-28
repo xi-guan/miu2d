@@ -10,10 +10,11 @@ import type { UIGoodData } from "@miu2d/engine/gui/ui-types";
 import { useDevice } from "@miu2d/shared";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
-import type { TouchDragData } from "../../../contexts";
+import { type TouchDragData, useGameUIContext } from "../../../contexts";
 import { useTouchDragSource, useTouchDropTarget } from "../../../hooks";
 import type { DragData } from "./EquipGui";
 import { useAsfImage } from "./hooks";
+import { resolvePanelPosition } from "./panelAlign";
 import { ScrollBar } from "./ScrollBar";
 import { useGoodsGuiConfig } from "./useUISettings";
 
@@ -220,6 +221,7 @@ export const GoodsGui: React.FC<GoodsGuiProps> = ({
   onTouchDrop,
 }) => {
   const [scrollOffset, setScrollOffset] = useState(0);
+  const { screenHeight } = useGameUIContext();
 
   // Load config from UI_Settings.ini
   const config = useGoodsGuiConfig();
@@ -236,16 +238,24 @@ export const GoodsGui: React.FC<GoodsGuiProps> = ({
     if (!config) return null;
     const panelWidth = panelImage.width || 330;
     const panelHeight = panelImage.height || 400;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      { left: screenWidth / 2 + config.panel.leftAdjust, top: config.panel.topAdjust }
+    );
 
     return {
       position: "absolute" as const,
-      left: screenWidth / 2 + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   // Calculate currently visible items
   const visibleItems = useMemo(() => {

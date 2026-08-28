@@ -161,20 +161,26 @@ const ClassicTitle: React.FC<TitleGuiProps & { config: TitleGuiConfig }> = ({
     return () => obs.disconnect();
   }, []);
 
-  // 计算缩放比（以背景图原始尺寸为基准，按 contain 模式适配容器）
+  // 坐标基准：按钮坐标活在 window.ini 的设计画布里，背景图可能只是它的缩略图（如 sword2 1280x720 → 640x480）
+  const canvas = useMemo(
+    () => (config.canvas ? { w: config.canvas[0], h: config.canvas[1] } : bgSize),
+    [config.canvas, bgSize]
+  );
+
+  // 计算缩放比（以设计画布为基准，按 contain 模式适配容器）
   const { scale, offsetLeft, offsetTop } = useMemo(() => {
-    if (!bgSize || containerSize.w === 0 || containerSize.h === 0) {
+    if (!canvas || containerSize.w === 0 || containerSize.h === 0) {
       return { scale: 1, offsetLeft: 0, offsetTop: 0 };
     }
-    const scaleX = containerSize.w / bgSize.w;
-    const scaleY = containerSize.h / bgSize.h;
+    const scaleX = containerSize.w / canvas.w;
+    const scaleY = containerSize.h / canvas.h;
     const s = Math.min(scaleX, scaleY);
     return {
       scale: s,
       offsetLeft: config.leftAdjust,
       offsetTop: config.topAdjust,
     };
-  }, [bgSize, containerSize, config.leftAdjust, config.topAdjust]);
+  }, [canvas, containerSize, config.leftAdjust, config.topAdjust]);
 
   // 制作人员按钮点击：有 creditsVideo 配置则用配置，否则默认 content/video/team.webm
   const handleCreditsClick = useCallback(() => {
@@ -192,8 +198,8 @@ const ClassicTitle: React.FC<TitleGuiProps & { config: TitleGuiConfig }> = ({
   }, [onCreditsClose]);
 
   // 背景图渲染尺寸
-  const renderedW = bgSize ? bgSize.w * scale : 0;
-  const renderedH = bgSize ? bgSize.h * scale : 0;
+  const renderedW = canvas ? canvas.w * scale : 0;
+  const renderedH = canvas ? canvas.h * scale : 0;
   const marginLeft = (containerSize.w - renderedW) / 2;
   const marginTop = (containerSize.h - renderedH) / 2;
 

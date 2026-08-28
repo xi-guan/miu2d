@@ -13,10 +13,11 @@ import type { MagicItemInfo } from "@miu2d/engine/magic";
 import { useDevice } from "@miu2d/shared";
 import type React from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { type TouchDragData, useTouchDrag } from "../../../contexts";
+import { type TouchDragData, useGameUIContext, useTouchDrag } from "../../../contexts";
 import { useTouchDropTarget } from "../../../hooks";
 import { AsfAnimatedSprite } from "./AsfAnimatedSprite";
 import { useAsfImage } from "./hooks";
+import { resolvePanelPosition } from "./panelAlign";
 import { ScrollBar } from "./ScrollBar";
 import { useMagicsGuiConfig } from "./useUISettings";
 
@@ -347,6 +348,7 @@ export const MagicGui: React.FC<MagicGuiProps> = ({
   // 触摸拖拽支持
   const { startDrag } = useTouchDrag();
 
+  const { screenHeight } = useGameUIContext();
   // 从 UI_Settings.ini 加载配置
   const config = useMagicsGuiConfig();
 
@@ -360,16 +362,24 @@ export const MagicGui: React.FC<MagicGuiProps> = ({
     if (!config) return null;
     const panelWidth = panelImage.width || 330;
     const panelHeight = panelImage.height || 400;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      { left: screenWidth / 2 + config.panel.leftAdjust, top: config.panel.topAdjust }
+    );
 
     return {
       position: "absolute" as const,
-      left: screenWidth / 2 + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   // 计算当前显示的武功（使用新数据源）
   const cols = config?.cols ?? 3;

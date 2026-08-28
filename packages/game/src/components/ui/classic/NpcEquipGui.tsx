@@ -11,8 +11,10 @@ import type { UIGoodData } from "@miu2d/engine/gui/ui-types";
 import { useDevice } from "@miu2d/shared";
 import type React from "react";
 import { useCallback, useMemo } from "react";
+import { useGameUIContext } from "../../../contexts";
 import { useTouchDragSource } from "../../../hooks/useTouchDragSource";
 import { useAsfImage } from "./hooks";
+import { resolvePanelPosition } from "./panelAlign";
 import { useNpcEquipGuiConfig } from "./useUISettings";
 
 // Equipment slot type (same as EquipGui)
@@ -213,6 +215,7 @@ export const NpcEquipGui: React.FC<NpcEquipGuiProps> = ({
   onSlotMouseLeave,
   dragData,
 }) => {
+  const { screenHeight } = useGameUIContext();
   // Load config from UI_Settings.ini [NpcEquip] section
   const config = useNpcEquipGuiConfig();
 
@@ -220,22 +223,34 @@ export const NpcEquipGui: React.FC<NpcEquipGuiProps> = ({
   const backgroundImage =
     character?.backgroundTextureEquip || config?.panel.image || "asf/ui/common/panel7.asf";
   const panelImage = useAsfImage(backgroundImage);
+  const overlayImage = useAsfImage(config?.panel.overlayImage ?? "");
 
   // Calculate panel position - Globals.WindowWidth / 2f - Width + leftAdjust
   const panelStyle = useMemo(() => {
     if (!config) return null;
     const panelWidth = panelImage.width || 300;
     const panelHeight = panelImage.height || 400;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      {
+        left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
+        top: config.panel.topAdjust,
+      }
+    );
 
     return {
       position: "absolute" as const,
-      left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   // Check if drag can be dropped in slot
   const canDropInSlot = useCallback(
@@ -326,6 +341,23 @@ export const NpcEquipGui: React.FC<NpcEquipGuiProps> = ({
             top: 0,
             width: panelImage.width,
             height: panelImage.height,
+            imageRendering: "pixelated",
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {/* 装饰性叠加图（装备格子边框）*/}
+      {overlayImage.dataUrl && (
+        <img
+          src={overlayImage.dataUrl}
+          alt=""
+          style={{
+            position: "absolute",
+            left: config.panel.overlayLeft ?? 0,
+            top: config.panel.overlayTop ?? 0,
+            width: overlayImage.width,
+            height: overlayImage.height,
             imageRendering: "pixelated",
             pointerEvents: "none",
           }}

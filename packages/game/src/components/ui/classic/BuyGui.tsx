@@ -20,8 +20,10 @@
 import type { UIGoodData } from "@miu2d/engine/gui/ui-types";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
+import { useGameUIContext } from "../../../contexts";
 import { AsfAnimatedSprite } from "./AsfAnimatedSprite";
 import { playUiSound, useAsfImage } from "./hooks";
+import { resolvePanelPosition } from "./panelAlign";
 import { ScrollBar } from "./ScrollBar";
 import { useBuySellGuiConfig } from "./useUISettings";
 
@@ -142,6 +144,7 @@ export const BuyGui: React.FC<BuyGuiProps> = ({
   onClose,
 }) => {
   const [scrollOffset, setScrollOffset] = useState(0);
+  const { screenHeight } = useGameUIContext();
 
   // Load config from UI_Settings.ini
   const config = useBuySellGuiConfig();
@@ -154,16 +157,27 @@ export const BuyGui: React.FC<BuyGuiProps> = ({
     if (!config) return null;
     const panelWidth = panelImage.width || 300;
     const panelHeight = panelImage.height || 400;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      {
+        left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
+        top: config.panel.topAdjust,
+      }
+    );
 
     return {
       position: "absolute" as const,
-      left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   // Calculate currently visible items (3x3 grid, 3 items per row)
   const visibleItems = useMemo(() => {

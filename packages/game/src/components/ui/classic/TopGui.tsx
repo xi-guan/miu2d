@@ -136,6 +136,11 @@ export const TopGui: React.FC = () => {
   // 加载面板背景
   const panelImage = useAsfImage(config?.panel.image ?? null);
 
+  // sword2: 按钮栏 anchor=Bottom, 与底栏槽位栏共用同一张 window.msf 背景,
+  // 底栏渲染在后(盖在上面)且容器 pointerEvents:auto 会吞掉按钮点击。
+  // 此时抬高 z-index 让按钮浮到底栏之上, 并跳过重复背景(底栏已画)。
+  const isBottomAnchored = config?.panel.anchor === "Bottom";
+
   // 按钮处理器映射
   const handlers: Record<string, () => void> = useMemo(
     () => ({
@@ -158,7 +163,6 @@ export const TopGui: React.FC = () => {
     const panelHeight = panelImage.height || 19;
     const leftAdjust = config?.panel.leftAdjust ?? 0;
     const topAdjust = config?.panel.topAdjust ?? 0;
-    const isBottomAnchored = config?.panel.anchor === "Bottom";
 
     const left = (screenWidth - panelWidth) / 2 + leftAdjust;
 
@@ -169,8 +173,9 @@ export const TopGui: React.FC = () => {
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "none" as const,
+      ...(isBottomAnchored ? { zIndex: 5 } : {}),
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, panelImage.width, panelImage.height, config, isBottomAnchored]);
 
   // 如果配置缺失或面板图片还在加载，不渲染任何内容
   if (!config || panelImage.isLoading) {
@@ -179,8 +184,8 @@ export const TopGui: React.FC = () => {
 
   return (
     <div style={panelStyle}>
-      {/* 背景面板 */}
-      {panelImage.dataUrl && (
+      {/* 背景面板 (sword2 底栏已画同一张, 跳过避免盖住槽位图标) */}
+      {panelImage.dataUrl && !isBottomAnchored && (
         <img
           src={panelImage.dataUrl}
           alt="顶部按钮栏"

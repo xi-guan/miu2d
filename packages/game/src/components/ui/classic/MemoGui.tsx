@@ -7,7 +7,9 @@
  */
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useGameUIContext } from "../../../contexts";
 import { useAsfImage } from "./hooks";
+import { resolvePanelPosition } from "./panelAlign";
 import { ScrollBar } from "./ScrollBar";
 import { useMemoGuiConfig } from "./useUISettings";
 
@@ -22,6 +24,7 @@ export const MemoGui: React.FC<MemoGuiProps> = ({ isVisible, memos, screenWidth 
   const [scrollOffset, setScrollOffset] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState(0);
+  const { screenHeight } = useGameUIContext();
 
   // 从 UI_Settings.ini 加载配置
   const config = useMemoGuiConfig();
@@ -43,17 +46,25 @@ export const MemoGui: React.FC<MemoGuiProps> = ({ isVisible, memos, screenWidth 
     if (!config) return null;
     const panelWidth = panelImage.width || 185;
     const panelHeight = panelImage.height || 225;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      { left: screenWidth / 2 + config.panel.leftAdjust, top: config.panel.topAdjust }
+    );
 
     return {
       position: "absolute" as const,
-      left: screenWidth / 2 + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
       zIndex: 100,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   // 像素级滚动：可滚动的最大像素偏移
   const viewHeight = config?.text.height ?? 180;

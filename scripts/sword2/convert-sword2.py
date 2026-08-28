@@ -136,6 +136,18 @@ def build_sword2_ui_settings(root: str) -> str:
         """\\sound\\界-主菜单.wav  →  界-主菜单.wav"""
         return os.path.basename(raw.replace("\\", "/")) if raw else ""
 
+    def _align(d: dict) -> tuple[str, str]:
+        """align=albottomcenter 下 alignx/aligny 即引擎的 leftAdjust/topAdjust:
+        left = (canvasW - width)/2 + alignx, 与 window.ini 声明的 left 逐一吻合。"""
+        return d.get("alignx", "0") or "0", d.get("aligny", "0") or "0"
+
+    def _anchor(d: dict) -> None:
+        """把 window.ini 的锚点原样落进合并 ini, 取代此前逐个手调的偏移常数。"""
+        ax, ay = _align(d)
+        w(f"LeftAdjust={ax}")
+        w(f"TopAdjust={ay}")
+        _kv("Align", d.get("align", ""))
+
     lines: list[str] = []
     w = lines.append
 
@@ -187,6 +199,9 @@ def build_sword2_ui_settings(root: str) -> str:
                 break
     w("[Title]")
     _kv("BackgroundImage", title_bg if title_bg else "asf/ui/title/title.msf")
+    # 按钮坐标基准, 背景图往往是它的缩略图 (1280x720 → 640x480)
+    _kv("Width", tw.get("width", ""))
+    _kv("Height", tw.get("height", ""))
     w("")
 
     for btn_file, section_key in [
@@ -211,8 +226,7 @@ def build_sword2_ui_settings(root: str) -> str:
     sw = _rini("saveload", "Window.ini")
     w("[SaveLoad]")
     _kv("Image", _img(sw.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    _anchor(sw)
     w("")
 
     snap = _rini("saveload", "SnapBmp.ini")
@@ -280,8 +294,7 @@ def build_sword2_ui_settings(root: str) -> str:
     sysw = _rini("system", "Window.ini")
     w("[System]")
     _kv("Image", _img(sysw.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    _anchor(sysw)
     w("")
 
     for btn_file, section_key in [
@@ -308,8 +321,9 @@ def build_sword2_ui_settings(root: str) -> str:
     _kv("Image", _img(cw.get("image", "")))
     _kv("Width", cw.get("width", "640"))
     _kv("Height", cw.get("height", ""))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    cax, cay = _align(cw)
+    w(f"LeftAdjust={cax}")
+    w(f"TopAdjust={cay}")
     w("")
 
     for col_file, section_key in [
@@ -330,10 +344,11 @@ def build_sword2_ui_settings(root: str) -> str:
 
     # ── Top (button bar — uses bottom window image) ───────────
     bw = _rini("bottom", "Window.ini")
+    bax, bay = _align(bw)
     w("[Top]")
     _kv("Image", _img(bw.get("image", "")))
-    w("LeftAdjust=-276")
-    w("TopAdjust=0")
+    w(f"LeftAdjust={bax}")
+    w(f"TopAdjust={bay}")
     w("Anchor=Bottom")
     w("")
 
@@ -361,8 +376,8 @@ def build_sword2_ui_settings(root: str) -> str:
     # ── Bottom (quickbar items) ───────────────────────────────
     w("[Bottom]")
     _kv("Image", _img(bw.get("image", "")))
-    w("LeftAdjust=-87")
-    w("TopAdjust=0")
+    w(f"LeftAdjust={bax}")
+    w(f"TopAdjust={bay}")
     w("")
 
     w("[Bottom_Items]")
@@ -380,8 +395,7 @@ def build_sword2_ui_settings(root: str) -> str:
     dw = _rini("dialog", "Window.ini")
     w("[Dialog]")
     _kv("Image", _img(dw.get("image", "")))
-    w("LeftAdjust=-20")
-    w("TopAdjust=-208")
+    _anchor(dw)
     w("")
 
     # sword2 dialog 无独立 Txt/SelA/SelB ini 文件 — 使用 xin 默认值
@@ -425,10 +439,12 @@ def build_sword2_ui_settings(root: str) -> str:
 
     # ── State panel ──────────────────────────────────────────
     si = _rini("state", "Image.ini")
+    stw = _rini("state", "Window.ini")
     w("[State]")
-    _kv("Image", _img(si.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    # window.ini=底板(common/panel), image.ini(状态文字)是叠加层
+    _kv("Image", _img(stw.get("image", "")))
+    _kv("OverlayImage", _img(si.get("image", "")))
+    _anchor(stw)
     w("")
 
     for ini_file, section_key in [
@@ -458,10 +474,12 @@ def build_sword2_ui_settings(root: str) -> str:
     # ── Equip ────────────────────────────────────────────────
     # engine equipSlotsFrom 读取 ${prefix}_Head/Neck/Body/Back/Hand/Wrist/Foot
     ei = _rini("equip", "Image.ini")
+    ew = _rini("equip", "Window.ini")
     w("[Equip]")
-    _kv("Image", _img(ei.get("image", "")))
-    w("LeftAdjust=-150")
-    w("TopAdjust=0")
+    # window.ini=底板(common/panel), image.ini(装备槽)是叠加层
+    _kv("Image", _img(ew.get("image", "")))
+    _kv("OverlayImage", _img(ei.get("image", "")))
+    _anchor(ew)
     w("")
 
     equip_slot_names = [
@@ -485,9 +503,10 @@ def build_sword2_ui_settings(root: str) -> str:
     # engine parseNpcEquipGuiConfig 需要 [NpcEquip] + 7 个 slot
     # sword2 没有独立 npcequip 文件夹，复用 Equip 布局
     w("[NpcEquip]")
-    _kv("Image", _img(ei.get("image", "")))
-    w("LeftAdjust=-150")
-    w("TopAdjust=0")
+    # 同 Equip: window.ini=底板(common/panel), image.ini(装备槽)是叠加层
+    _kv("Image", _img(ew.get("image", "")))
+    _kv("OverlayImage", _img(ei.get("image", "")))
+    _anchor(ew)
     w("")
 
     npc_equip_slot_names = [
@@ -515,8 +534,7 @@ def build_sword2_ui_settings(root: str) -> str:
     xw = _rini("xiulian", "Window.ini")
     w("[XiuLian]")
     _kv("Image", _img(xw.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    _anchor(xw)
     w("")
 
     # [XiuLian_Magic_Image] — 从 Magic.ini 读取武功图标位置
@@ -586,8 +604,7 @@ def build_sword2_ui_settings(root: str) -> str:
     gslide = _rini("goods", "SlideBtn.ini")
     w("[Goods]")
     _kv("Image", _img(gw.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    _anchor(gw)
     # 滚动栏: engine scrollBarFrom 读取 ScrollBarLeft/ScrollBarRight(=top)/ScrollBarWidth/ScrollBarHeight/ScrollBarButton
     _kv("ScrollBarLeft", gsb.get("left", "178"))
     _kv("ScrollBarRight", gsb.get("top", "40"))
@@ -627,8 +644,7 @@ def build_sword2_ui_settings(root: str) -> str:
     mslide = _rini("magic", "SlideBtn.ini")
     w("[Magics]")
     _kv("Image", _img(mw.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    _anchor(mw)
     _kv("ScrollBarLeft", msb.get("left", "178"))
     _kv("ScrollBarRight", msb.get("top", "40"))
     _kv("ScrollBarWidth", msb.get("width", "28"))
@@ -658,8 +674,7 @@ def build_sword2_ui_settings(root: str) -> str:
     memow = _rini("memo", "Window.ini")
     w("[Memo]")
     _kv("Image", _img(memow.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    _anchor(memow)
     w("")
 
     # [Memo_Text] — 从 memo.ini 读取（memo/memo.ini 是文字区域）
@@ -690,8 +705,7 @@ def build_sword2_ui_settings(root: str) -> str:
     msgw = _rini("message", "Window.ini")
     w("[Message]")
     _kv("Image", _img(msgw.get("image", "")))
-    w("LeftAdjust=-40")
-    w("TopAdjust=-110")
+    _anchor(msgw)
     w("")
 
     msgl = _rini("message", "Label.ini")
@@ -738,8 +752,7 @@ def build_sword2_ui_settings(root: str) -> str:
     bsclose = _rini("buysell", "CloseBtn.ini")
     w("[BuySell]")
     _kv("Image", _img(bsw.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    _anchor(bsw)
     _kv("ScrollBarLeft", bssb.get("left", "178"))
     _kv("ScrollBarRight", bssb.get("top", "40"))
     _kv("ScrollBarWidth", bssb.get("width", "28"))
@@ -771,8 +784,7 @@ def build_sword2_ui_settings(root: str) -> str:
     ynw = _rini("yesno", "Window.ini")
     w("[YesNo]")
     _kv("Image", _img(ynw.get("image", "")))
-    w("LeftAdjust=0")
-    w("TopAdjust=0")
+    _anchor(ynw)
     w("")
 
     yy = _rini("yesno", "BtnYes.ini")

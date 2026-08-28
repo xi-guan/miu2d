@@ -7,7 +7,9 @@
  */
 import type React from "react";
 import { useMemo } from "react";
+import { useGameUIContext } from "../../../contexts";
 import { useAsfImage } from "./hooks";
+import { resolvePanelPosition } from "./panelAlign";
 import { useStateGuiConfig } from "./useUISettings";
 
 export interface PlayerStats {
@@ -65,6 +67,7 @@ export const StateGui: React.FC<StateGuiProps> = ({
   playerIndex = 0,
   screenWidth,
 }) => {
+  const { screenHeight } = useGameUIContext();
   // 从 UI_Settings.ini 加载配置
   const config = useStateGuiConfig();
 
@@ -85,16 +88,27 @@ export const StateGui: React.FC<StateGuiProps> = ({
     if (!config) return null;
     const panelWidth = panelImage.width || 172;
     const panelHeight = panelImage.height || 400;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      {
+        left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
+        top: config.panel.topAdjust,
+      }
+    );
 
     return {
       position: "absolute" as const,
-      left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   // 格式化攻击力显示
   const attackText = useMemo(() => {

@@ -9,7 +9,9 @@
 import type { ButtonConfig } from "@miu2d/engine/gui/ui-settings";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
+import { useGameUIContext } from "../../../contexts";
 import { playUiSound, useAsfImage } from "./hooks";
+import { resolvePanelPosition } from "./panelAlign";
 import { useSystemGuiConfig } from "./useUISettings";
 
 interface SystemGuiProps {
@@ -91,6 +93,7 @@ export const SystemGui: React.FC<SystemGuiProps> = ({
   onExit,
   onReturn,
 }) => {
+  const { screenHeight } = useGameUIContext();
   // 从 UI_Settings.ini 加载配置
   const config = useSystemGuiConfig();
 
@@ -102,16 +105,27 @@ export const SystemGui: React.FC<SystemGuiProps> = ({
     if (!config) return null;
     const panelWidth = panelImage.width || 185;
     const panelHeight = panelImage.height || 400;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      {
+        left: (screenWidth - panelWidth) / 2 + config.panel.leftAdjust,
+        top: config.panel.topAdjust,
+      }
+    );
 
     return {
       position: "absolute" as const,
-      left: (screenWidth - panelWidth) / 2 + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   if (!isVisible || !config || !panelStyle) return null;
 

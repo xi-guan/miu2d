@@ -65,7 +65,14 @@ export type ThemePanel =
       overlayOffset?: Pos;
       size?: Size;
       anchor?: "bottom";
+      align?: PanelAlign;
     };
+
+/**
+ * 面板相对屏幕的锚点，来自 window.ini 的 align=（alltcorner / alrtcorner / alcenter ...）。
+ * 缺省时各面板沿用自己原有的「贴屏幕中线」公式，不改动 yueying 一代的布局。
+ */
+export type PanelAlign = "lt" | "rt" | "lb" | "rb" | "center" | "bc";
 
 /** 按钮 */
 export interface ThemeButton {
@@ -132,6 +139,8 @@ export interface ThemeMapText {
 
 export interface ThemeTitle {
   background: string;
+  /** 按钮坐标所在的设计画布，来自 title/window.ini 的 width/height；缺省时退回背景图原始尺寸 */
+  canvas?: Pos;
   offset?: Pos;
   buttons: {
     begin: ThemeButton;
@@ -382,6 +391,7 @@ export interface PanelConfig {
   width?: number;
   height?: number;
   anchor?: "Top" | "Bottom";
+  align?: PanelAlign;
 }
 
 export interface SystemGuiConfig {
@@ -602,6 +612,8 @@ export interface ToolTipType1Config {
 
 export interface TitleGuiConfig {
   backgroundImage: string;
+  /** 按钮坐标所在的设计画布；缺省时退回背景图原始尺寸 */
+  canvas?: Pos;
   topAdjust: number;
   leftAdjust: number;
   beginBtn: ButtonConfig;
@@ -657,6 +669,7 @@ function resolvePanel(p: ThemePanel): PanelConfig {
     ...(p.overlayOffset ? { overlayLeft: p.overlayOffset[0], overlayTop: p.overlayOffset[1] } : {}),
     ...(p.size ? { width: p.size[0], height: p.size[1] } : {}),
     ...(p.anchor === "bottom" ? { anchor: "Bottom" as const } : {}),
+    ...(p.align ? { align: p.align } : {}),
   };
 }
 
@@ -797,6 +810,7 @@ export function resolveTheme(theme: UiTheme): ResolvedUiConfigs {
   const title: TitleGuiConfig | null = theme.title
     ? {
         backgroundImage: theme.title.background,
+        ...(theme.title.canvas ? { canvas: theme.title.canvas } : {}),
         topAdjust: theme.title.offset?.[1] ?? 0,
         leftAdjust: theme.title.offset?.[0] ?? 0,
         beginBtn: resolveButton(theme.title.buttons.begin),

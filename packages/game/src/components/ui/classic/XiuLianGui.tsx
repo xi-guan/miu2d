@@ -14,10 +14,11 @@ import { MAGIC_LIST_CONFIG } from "@miu2d/engine/player/magic/magic-list-config"
 import { useDevice } from "@miu2d/shared";
 import type React from "react";
 import { useCallback, useMemo } from "react";
-import type { TouchDragData } from "../../../contexts";
+import { type TouchDragData, useGameUIContext } from "../../../contexts";
 import { useTouchDragSource, useTouchDropTarget } from "../../../hooks";
 import { useAsfAnimation, useAsfImage } from "./hooks";
 import type { MagicDragData } from "./MagicGui";
+import { resolvePanelPosition } from "./panelAlign";
 import { useXiuLianGuiConfig } from "./useUISettings";
 
 // 修炼中的武功数据 - 兼容旧接口
@@ -76,6 +77,7 @@ export const XiuLianGui: React.FC<XiuLianGuiProps> = ({
   onMagicLeave,
   onTouchDrop,
 }) => {
+  const { screenHeight } = useGameUIContext();
   // 从 UI_Settings.ini 加载配置
   const config = useXiuLianGuiConfig();
 
@@ -167,16 +169,27 @@ export const XiuLianGui: React.FC<XiuLianGuiProps> = ({
     if (!config) return null;
     const panelWidth = panelImage.width || 290;
     const panelHeight = panelImage.height || 400;
+    const { left, top } = resolvePanelPosition(
+      config.panel,
+      panelWidth,
+      panelHeight,
+      screenWidth,
+      screenHeight,
+      {
+        left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
+        top: config.panel.topAdjust,
+      }
+    );
 
     return {
       position: "absolute" as const,
-      left: screenWidth / 2 - panelWidth + config.panel.leftAdjust,
-      top: config.panel.topAdjust,
+      left,
+      top,
       width: panelWidth,
       height: panelHeight,
       pointerEvents: "auto" as const,
     };
-  }, [screenWidth, panelImage.width, panelImage.height, config]);
+  }, [screenWidth, screenHeight, panelImage.width, panelImage.height, config]);
 
   if (!isVisible || !config || !panelStyle) return null;
 
