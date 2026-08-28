@@ -134,31 +134,50 @@ convert-verify:
     echo "→ verifying mpc/msf lossless"
     cargo run --release --manifest-path packages/converter/Cargo.toml --bin verify_mpc -- resources/mpc
 
-# 构建并推送镜像 — just release <all|server|web|game-yueying|game-sword1|game-sword2>
-release target="":
+# 构建并推送镜像 — 不带参数进 fzf 多选; 也可 just release web server
+release *targets:
     #!/usr/bin/env bash
     set -euo pipefail
-    t="{{target}}"
-    case "$t" in
-        server|web|game-yueying|game-sword1|game-sword2) ;;
-        all)
-            # five images, and the server one is --no-cache dual-arch — a mistyped target costs 10+ minutes
-            read -r -p "构建并推送全部 5 个镜像? [y/N] " ans
-            [[ "$ans" == [yY] ]] || { echo "aborted"; exit 0; }
-            ;;
-        "")
-            # 空参数不默认建 server: 改成带参数前 `just release` 就是 server, 静默沿用会让肌肉记忆推错镜像
-            echo "用法: just release <target>"
-            echo "  all             5 个镜像全推 (会先问一次)"
-            echo "  server          {{server_image}}"
-            echo "  web             {{web_image}} (含 dashboard)"
-            echo "  game-yueying    {{game_image}}yueying — 素材 + DB 种子"
-            echo "  game-sword1     {{game_image}}sword1"
-            echo "  game-sword2     {{game_image}}sword2"
+    menu=(
+        "all             5 个镜像全推"
+        "server          {{server_image}}"
+        "web             {{web_image}} (含 dashboard)"
+        "game-yueying    {{game_image}}yueying — 素材 + DB 种子"
+        "game-sword1     {{game_image}}sword1"
+        "game-sword2     {{game_image}}sword2"
+    )
+    picked="{{targets}}"
+    from_menu=0
+    if [ -z "$picked" ]; then
+        command -v fzf >/dev/null || {
+            echo "✗ 没装 fzf — brew install fzf, 或者直接写目标: just release web"
+            printf '  %s\n' "${menu[@]}"
             exit 1
-            ;;
-        *) echo "✗ 未知目标 $t — 跑 just release 看可选项"; exit 1 ;;
-    esac
+        }
+        # 外观交给 $FZF_DEFAULT_OPTS; 这里只要多选和一行说明
+        picked=$(printf '%s\n' "${menu[@]}" \
+            | fzf -m --header='Tab 多选, Enter 确认, Esc 取消' \
+            | awk '{print $1}' | tr '\n' ' ')
+        [ -n "$picked" ] || { echo "aborted"; exit 0; }
+        from_menu=1
+    fi
+    build=()
+    for x in $picked; do
+        case "$x" in
+            server|web|game-yueying|game-sword1|game-sword2) build+=("$x") ;;
+            all)
+                # 只在命令行直接敲 all 时问一次: 五个镜像里 server 那条是 --no-cache 双架构,
+                # 打错字的代价是十几分钟; 菜单里选的时候已经看见列表了, 不再多问
+                if [ "$from_menu" -eq 0 ]; then
+                    read -r -p "构建并推送全部 5 个镜像? [y/N] " ans
+                    [[ "$ans" == [yY] ]] || { echo "aborted"; exit 0; }
+                fi
+                build=(server web game-yueying game-sword1 game-sword2)
+                break
+                ;;
+            *) echo "✗ 未知目标 $x — 跑 just release 看可选项"; exit 1 ;;
+        esac
+    done
     # dirty builds once poisoned the buildx cache with a broken bundle layer — refuse outright
     [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
     : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
@@ -172,16 +191,13 @@ release target="":
     # multi-arch manifest needs a docker-container builder; the classic docker driver can't export one
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
     # the sub-recipes inherit DOCKER_CONFIG through the environment, so credentials are written once
-    case "$t" in
-        all)
-            just _release-server
-            just _release-web
-            for s in yueying sword1 sword2; do just _release-game "$s"; done
-            ;;
-        server)  just _release-server ;;
-        web)     just _release-web ;;
-        game-*)  just _release-game "${t#game-}" ;;
-    esac
+    for x in "${build[@]}"; do
+        case "$x" in
+            server)  just _release-server ;;
+            web)     just _release-web ;;
+            game-*)  just _release-game "${x#game-}" ;;
+        esac
+    done
     echo ""
     echo "── 上线: NAS (192.168.1.63) 的 /volume1/docker/miu2d 下 ──"
     echo "  sudo docker compose pull && sudo docker compose up -d"
