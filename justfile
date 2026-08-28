@@ -1,5 +1,8 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# every push recipe logs in from $GITEA_REGISTRY_TOKEN and logs out on exit rather than
+# relying on a persisted `docker login`: the keychain holds one credential per host for the
+# whole machine, so a login from any other project silently replaces this one
 server_image := "gitea.susie.se/coaster/miu2d-server"
 web_image := "gitea.susie.se/coaster/miu2d-web"
 game_image := "gitea.susie.se/coaster/miu2d-game-"
@@ -138,6 +141,9 @@ release:
     hash=$(git rev-parse --short HEAD)
     # dirty builds once poisoned the buildx cache with a broken bundle layer — refuse outright
     [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
+    : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
+    printf '%s' "$GITEA_REGISTRY_TOKEN" | docker login gitea.susie.se -u dcsp --password-stdin
+    trap 'docker logout gitea.susie.se >/dev/null 2>&1 || true' EXIT
     # multi-arch manifest needs a docker-container builder; the classic docker driver can't export one
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
     echo "→ building {{server_image}} (amd64 + arm64) @ $hash"
@@ -163,6 +169,9 @@ release-web:
     set -euo pipefail
     hash=$(git rev-parse --short HEAD)
     [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
+    : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
+    printf '%s' "$GITEA_REGISTRY_TOKEN" | docker login gitea.susie.se -u dcsp --password-stdin
+    trap 'docker logout gitea.susie.se >/dev/null 2>&1 || true' EXIT
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
     echo "→ building {{web_image}} (amd64 + arm64) @ $hash"
     # VITE_* / STATIC_ONLY are left at their Dockerfile defaults on purpose: verified
@@ -186,6 +195,10 @@ release-game slug:
     hash=$(git rev-parse --short HEAD)
     [ -z "$(git status --porcelain)" ] || { echo "✗ uncommitted changes — commit first"; exit 1; }
     [ -d "resources/{{slug}}" ] || { echo "✗ resources/{{slug}} not found"; exit 1; }
+    # before the seed export, so a missing token costs nothing
+    : "${GITEA_REGISTRY_TOKEN:?未设置 — 在放其他 registry token 的地方加一行, scope 要 write:package}"
+    printf '%s' "$GITEA_REGISTRY_TOKEN" | docker login gitea.susie.se -u dcsp --password-stdin
+    trap 'docker logout gitea.susie.se >/dev/null 2>&1 || true' EXIT
     echo "→ exporting {{slug}} seed from local db (needs: just db up)"
     (cd packages/server && bunx tsx --tsconfig tsconfig.dev.json scripts/export-game-seed.ts {{slug}})
     docker buildx inspect miu2d >/dev/null 2>&1 || docker buildx create --name miu2d --driver docker-container
