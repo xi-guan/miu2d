@@ -274,7 +274,8 @@ export const StatePanel: React.FC<StatePanelProps> = ({
   isVisible,
   stats,
   onClose,
-  playerName = "主角",
+  // no fallback name: "主角" is not a real portrait in any game, it only 404s
+  playerName = "",
 }) => {
   const panelWidth = 280;
 
