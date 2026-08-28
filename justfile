@@ -7,6 +7,12 @@ server_image := "gitea.susie.se/coaster/miu2d-server"
 web_image := "gitea.susie.se/coaster/miu2d-web"
 game_image := "gitea.susie.se/coaster/miu2d-game-"
 
+nas_host := env_var_or_default("MIU2D_NAS_HOST", "xi@homelab-nas")
+nas_key := env_var_or_default("MIU2D_NAS_KEY", "~/.ssh/nas-admin-xi")
+nas_dir := env_var_or_default("MIU2D_NAS_DIR", "/volume1/docker/miu2d")
+homelab := env_var_or_default("MIU2D_HOMELAB", "~/homelab")
+nas_url := env_var_or_default("MIU2D_NAS_URL", "http://192.168.1.63:8090")
+
 _default:
     @just --list --unsorted --list-heading '' --list-prefix='- '
 
@@ -265,3 +271,60 @@ _release-game slug:
     echo "  验证: sudo docker logs miu2d-game-{{slug}}     # assets installed / up-to-date"
     # 种子只填空库(seed-games.ts: already present, skipped), 库里已有该 slug 就不会被覆盖
     echo "  验证: sudo docker logs miu2d-server | grep seed"
+
+# `just upload nas-720` in the homelab repo is not this: it diffs the compose files first,
+# and a release changes none of them — the assets ride inside the content images — so it
+# reports "no changes" and the old containers keep running. That repo stays where configs come from.
+# 在 NAS 上拉 :latest 重启整个栈 — 这一步才算上线
+deploy:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # up front, not in a branch further down: every way this recipe fails ends in
+    # "go run just upload nas-720 over there", so demand the there first
+    hl="{{homelab}}"; hl="${hl/#\~/$HOME}"
+    [ -d "$hl" ] || {
+        echo "✗ 没有 homelab 仓库 — $hl 不在"
+        echo "  NAS 上的配置由它管, 先 clone 下来, 或者 MIU2D_HOMELAB=<路径> 指过去"
+        exit 1
+    }
+    # one connection for the whole thing: the key carries a passphrase and sudo asks for a
+    # password, so a second ssh would be a second prompt to type through. the stack check
+    # rides along as exit 9 instead of a round trip of its own.
+    # -t: without a tty sudo cannot ask at all, it just says "no tty present" and dies.
+    # IdentityAgent=none on purpose: with an agent in the picture the passphrase is typed once
+    # and every later ssh goes through unchallenged. deploying is rare enough to type it each time
+    echo "→ 会问两次密码, 顺序是:"
+    echo "   1) 钥匙 passphrase — 提示里会出现 {{nas_key}}"
+    echo "   2) NAS 上的 sudo 密码 — 提示写着 [NAS sudo]"
+    ssh -t -o ConnectTimeout=10 -o IdentitiesOnly=yes -o IdentityAgent=none \
+        -i {{nas_key}} {{nas_host}} \
+        "d=\$(command -v docker 2>/dev/null || true)
+         for p in /usr/local/bin/docker /usr/bin/docker; do
+             [ -n \"\$d\" ] && break
+             [ -x \"\$p\" ] && d=\$p
+         done
+         [ -n \"\$d\" ] || exit 8
+         test -f {{nas_dir}}/docker-compose.yml || exit 9
+         s() { sudo -p '[NAS sudo] 密码: ' \"\$@\"; }
+         cd {{nas_dir}} && s \"\$d\" compose pull && s \"\$d\" compose up -d \
+         && s \"\$d\" compose images" && rc=0 || rc=$?
+    # 255 is ssh itself failing to get there; 8 and 9 are the markers above, and nothing
+    # in docker or sudo returns either
+    if [ "$rc" -eq 255 ]; then
+        echo "✗ 连不上 {{nas_host}} — NAS 没开机, 或者 {{nas_key}} 这把钥匙不对"
+        exit 1
+    elif [ "$rc" -eq 8 ]; then
+        echo "✗ {{nas_host}} 上找不到 docker — Container Manager 装了吗?"
+        exit 1
+    elif [ "$rc" -eq 9 ]; then
+        echo "✗ {{nas_host}} 上没有 {{nas_dir}}/docker-compose.yml"
+        echo "  这条命令只换镜像, 配置得先在那儿。到 $hl 跑一次: just upload nas-720"
+        exit 1
+    elif [ "$rc" -ne 0 ]; then
+        echo "✗ 部署没成功 (退出码 $rc) — 上面是 NAS 那头的输出"
+        exit 1
+    fi
+    # 别用 /trpc/auth.me —— 没有这个 procedure，恒 404，分不出好坏。这条穿透 nginx→server→db
+    code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' {{nas_url}}/game/yueying/api/config || echo 000)
+    [ "$code" = "200" ] && echo "✓ deployed — {{nas_url}} (config 探活 200)" \
+        || echo "⚠ 镜像换好了, 但 {{nas_url}}/game/yueying/api/config 返回 $code — 看 sudo docker logs miu2d-server"
