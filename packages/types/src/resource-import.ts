@@ -135,6 +135,28 @@ function parseNpcIniField(content: string): string | null {
   return match ? match[1].toLowerCase() : null;
 }
 
+/**
+ * 清掉 npcres 里指向不存在素材的 image=。
+ * 原版按模板给每个 NPC 列全五种动作, 但不打架的平民从没画过攻击/死亡图;
+ * 留着名字只会让引擎逐个 fetch 再 404, 置空则和 run/sit 一样直接跳过。
+ */
+function stripDanglingNpcResImages(
+  content: string,
+  asfSprites: Set<string>,
+  mpcSprites: Set<string>
+): string {
+  return content.replace(/^([ \t]*image[ \t]*=)(.*)$/gim, (line, head: string, value: string) => {
+    const name = value.trim();
+    if (!name) return line;
+    const lower = name.toLowerCase();
+    const stem = lower.replace(/\.[^.]*$/, "");
+    const have = lower.endsWith(".mpc") ? mpcSprites : asfSprites;
+    // 拖进来的文件夹可能只含 ini/, 无从判断存在与否时一律保留
+    if (have.size === 0) return line;
+    return have.has(stem) ? line : head;
+  });
+}
+
 /** 从 obj ini 内容中解析 ObjFile 字段值 */
 function parseObjFileField(content: string): string | null {
   const match = content.match(/^\s*ObjFile\s*=\s*(.+?)\s*$/im);
@@ -302,10 +324,23 @@ export async function parseResourcesFolder(
   const npcFiles = new Map<string, { content: string; fileName: string }>();
   const npcResFiles = new Map<string, { content: string; fileName: string }>();
 
+  // 精灵图清单 — 解析规则同 character-res-loader: .mpc 走 mpc/character, 其余走 asf/character|interlude
+  const asfSprites = new Set<string>();
+  const mpcSprites = new Set<string>();
+  for (const f of byNorm) {
+    const stem = f.norm.replace(/^.*\//, "").replace(/\.[^.]*$/, "");
+    if (f.norm.startsWith("asf/character/") || f.norm.startsWith("asf/interlude/")) {
+      asfSprites.add(stem);
+    } else if (f.norm.startsWith("mpc/character/")) {
+      mpcSprites.add(stem);
+    }
+  }
+
   for (const f of byNorm) {
     if (!f.file.name.toLowerCase().endsWith(".ini")) continue;
     if (f.norm.startsWith("ini/npcres/")) {
-      const content = await f.file.text();
+      const raw = await f.file.text();
+      const content = stripDanglingNpcResImages(raw, asfSprites, mpcSprites);
       npcResFiles.set(f.file.name.toLowerCase(), { content, fileName: f.file.name });
     } else if (f.norm.startsWith("ini/npc/")) {
       const content = await f.file.text();
