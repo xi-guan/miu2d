@@ -1731,3 +1731,6 @@ asf\portrait\fac021.asf
 asf\goods\tm053-若敖剑.asf
 asf\portrait\fac072.asf
 asf\character\npc069s_st.asf
+asf\ui\littlehead\独孤剑.asf
+asf\ui\littlehead\张琳心.asf
+asf\ui\littlehead\杨瑛.asf

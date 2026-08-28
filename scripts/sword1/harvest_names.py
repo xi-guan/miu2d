@@ -60,7 +60,9 @@ PREFIXES = {
     ".txt": ["script\\map\\", "script\\common\\", "script\\goods\\", "script\\"],
     ".map": ["map\\map\\", "map\\littlemap\\", "map\\"],
     ".asf": ["asf\\character\\", "asf\\effect\\", "asf\\goods\\", "asf\\magic\\",
-             "asf\\object\\", "asf\\portrait\\", "asf\\ui\\", "asf\\font\\",
+             "asf\\object\\", "asf\\portrait\\", "asf\\ui\\",
+             # engine builds this path in code, so data only ever holds the bare name
+             "asf\\ui\\littlehead\\", "asf\\font\\",
              "asf\\interlude\\", "asf\\sound\\", "asf\\music\\", "asf\\video\\",
              "asf\\", "mpc\\character\\", "mpc\\effect\\", "mpc\\goods\\",
              "mpc\\magic\\", "mpc\\object\\", "mpc\\portrait\\", "mpc\\ui\\",
